@@ -5,12 +5,16 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const cookie = require("cookie");
 const bcrypt = require("bcryptjs");
+const { MongoClient } = require("mongodb");
 const { v4: uuidv4 } = require("uuid");
 const { Server } = require("socket.io");
 
 const PORT = Number(process.env.PORT || 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const NODE_ENV = process.env.NODE_ENV || "development";
+const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DB = process.env.MONGODB_DB || "nexgrex";
+const SESSION_HOURS = 12;
 
 const app = express();
 const server = http.createServer(app);
@@ -21,9 +25,9 @@ const io = new Server(server, {
   }
 });
 
-const users = new Map();
-const sessions = new Map();
-const messages = [];
+let usersCollection;
+let sessionsCollection;
+let messagesCollection;
 
 app.use(cors({
   origin: CLIENT_ORIGIN,
@@ -36,18 +40,25 @@ function normalizeUsername(value) {
   return String(value || "").trim();
 }
 
-function createSession(username) {
+async function createSession(username) {
   const sid = uuidv4();
-  sessions.set(sid, username);
+  const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
+  await sessionsCollection.insertOne({ sid, username, expiresAt });
   return sid;
 }
 
-function getSessionUsername(req) {
+async function getSessionUsername(req) {
   const sid = req.cookies.sid;
   if (!sid) {
     return null;
   }
-  return sessions.get(sid) || null;
+
+  const session = await sessionsCollection.findOne({ sid });
+  if (!session || session.expiresAt < new Date()) {
+    return null;
+  }
+
+  return session.username;
 }
 
 app.post("/api/login", async (req, res) => {
@@ -58,7 +69,7 @@ app.post("/api/login", async (req, res) => {
     return res.status(400).json({ error: "Username and password required." });
   }
 
-  const existing = users.get(username);
+  const existing = await usersCollection.findOne({ username });
 
   if (existing) {
     const ok = await bcrypt.compare(password, existing.passwordHash);
@@ -67,10 +78,10 @@ app.post("/api/login", async (req, res) => {
     }
   } else {
     const passwordHash = await bcrypt.hash(password, 10);
-    users.set(username, { passwordHash });
+    await usersCollection.insertOne({ username, passwordHash, createdAt: new Date() });
   }
 
-  const sid = createSession(username);
+  const sid = await createSession(username);
   res.cookie("sid", sid, {
     httpOnly: true,
     sameSite: "lax",
@@ -84,18 +95,21 @@ app.post("/api/login", async (req, res) => {
 app.post("/api/logout", (req, res) => {
   const sid = req.cookies.sid;
   if (sid) {
-    sessions.delete(sid);
+    sessionsCollection.deleteOne({ sid }).catch(() => {});
   }
   res.clearCookie("sid");
   res.json({ ok: true });
 });
 
 app.get("/api/me", (req, res) => {
-  const username = getSessionUsername(req);
-  if (!username) {
-    return res.status(401).json({ error: "Not signed in." });
-  }
-  return res.json({ username });
+  getSessionUsername(req)
+    .then((username) => {
+      if (!username) {
+        return res.status(401).json({ error: "Not signed in." });
+      }
+      return res.json({ username });
+    })
+    .catch(() => res.status(500).json({ error: "Server error." }));
 });
 
 if (NODE_ENV === "production") {
@@ -106,25 +120,42 @@ if (NODE_ENV === "production") {
   });
 }
 
-io.use((socket, next) => {
-  const rawCookie = socket.handshake.headers.cookie || "";
-  const parsed = cookie.parse(rawCookie);
-  const sid = parsed.sid;
-  const username = sid ? sessions.get(sid) : null;
+io.use(async (socket, next) => {
+  try {
+    const rawCookie = socket.handshake.headers.cookie || "";
+    const parsed = cookie.parse(rawCookie);
+    const sid = parsed.sid;
+    if (!sid) {
+      return next(new Error("unauthorized"));
+    }
 
-  if (!username) {
+    const session = await sessionsCollection.findOne({ sid });
+    if (!session || session.expiresAt < new Date()) {
+      return next(new Error("unauthorized"));
+    }
+
+    socket.data.username = session.username;
+    return next();
+  } catch (error) {
     return next(new Error("unauthorized"));
   }
-
-  socket.data.username = username;
-  return next();
 });
 
 io.on("connection", (socket) => {
   socket.join("global");
-  socket.emit("history", messages);
+  messagesCollection
+    .find({})
+    .sort({ ts: -1 })
+    .limit(200)
+    .toArray()
+    .then((docs) => {
+      socket.emit("history", docs.reverse());
+    })
+    .catch(() => {
+      socket.emit("history", []);
+    });
 
-  socket.on("message", (text) => {
+  socket.on("message", async (text) => {
     if (typeof text !== "string") {
       return;
     }
@@ -140,15 +171,38 @@ io.on("connection", (socket) => {
       ts: Date.now()
     };
 
-    messages.push(msg);
-    if (messages.length > 200) {
-      messages.shift();
+    try {
+      await messagesCollection.insertOne(msg);
+      io.to("global").emit("message", msg);
+    } catch (error) {
+      socket.emit("error", "Message failed to save.");
     }
-
-    io.to("global").emit("message", msg);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`NEXGREX server listening on ${PORT}`);
+async function start() {
+  if (!MONGODB_URI) {
+    console.error("Missing MONGODB_URI. Set it before starting the server.");
+    process.exit(1);
+  }
+
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  const db = client.db(MONGODB_DB);
+  usersCollection = db.collection("users");
+  sessionsCollection = db.collection("sessions");
+  messagesCollection = db.collection("messages");
+
+  await usersCollection.createIndex({ username: 1 }, { unique: true });
+  await sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  await messagesCollection.createIndex({ ts: -1 });
+
+  server.listen(PORT, () => {
+    console.log(`NEXGREX server listening on ${PORT}`);
+  });
+}
+
+start().catch((error) => {
+  console.error("Failed to start server", error);
+  process.exit(1);
 });

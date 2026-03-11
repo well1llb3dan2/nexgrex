@@ -8,7 +8,10 @@ const socketOptions = {
 
 export default function App() {
   const [status, setStatus] = useState("checking");
+  const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [activeUser, setActiveUser] = useState("");
   const [messages, setMessages] = useState([]);
@@ -69,7 +72,7 @@ export default function App() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ identifier, password })
     });
 
     if (!res.ok) {
@@ -81,7 +84,32 @@ export default function App() {
     const data = await res.json();
     setActiveUser(data.username);
     setStatus("logged-in");
+    setIdentifier("");
+    setPassword("");
+  };
+
+  const handleSignup = async (event) => {
+    event.preventDefault();
+    setError("");
+
+    const res = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ username, email, password })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Signup failed.");
+      return;
+    }
+
+    const data = await res.json();
+    setActiveUser(data.username);
+    setStatus("logged-in");
     setUsername("");
+    setEmail("");
     setPassword("");
   };
 
@@ -115,32 +143,87 @@ export default function App() {
 
       {status === "logged-out" && (
         <section className="card login">
-          <h2>Enter the room</h2>
-          <form onSubmit={handleLogin}>
-            <label>
-              Username
-              <input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Choose a handle"
-                autoComplete="username"
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Make it memorable"
-                autoComplete="current-password"
-              />
-            </label>
-            {error && <p className="error">{error}</p>}
-            <button type="submit" className="cta">
-              Join NEXGREX
+          <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+          <div className="auth-toggle">
+            <button
+              type="button"
+              className={mode === "login" ? "toggle active" : "toggle"}
+              onClick={() => setMode("login")}
+            >
+              Sign in
             </button>
-          </form>
+            <button
+              type="button"
+              className={mode === "signup" ? "toggle active" : "toggle"}
+              onClick={() => setMode("signup")}
+            >
+              Sign up
+            </button>
+          </div>
+
+          {mode === "login" ? (
+            <form onSubmit={handleLogin}>
+              <label>
+                Username or email
+                <input
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  placeholder="Your handle or email"
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                />
+              </label>
+              {error && <p className="error">{error}</p>}
+              <button type="submit" className="cta">
+                Sign in
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSignup}>
+              <label>
+                Username
+                <input
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="Choose a handle"
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Create a strong password"
+                  autoComplete="new-password"
+                />
+              </label>
+              {error && <p className="error">{error}</p>}
+              <button type="submit" className="cta">
+                Create account
+              </button>
+            </form>
+          )}
         </section>
       )}
 

@@ -4,7 +4,7 @@ Networked EXperience for the Gregarious Routing of Elderly eXchange (NEXGREX).
 
 ## What this is
 - Single-room group chat
-- Demo-only username/password login
+- Demo-only sign up + login (username, email, password)
 - Realtime updates via Socket.IO
 - MongoDB-backed users and messages
 

@@ -40,6 +40,14 @@ function normalizeUsername(value) {
   return String(value || "").trim();
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isValidEmail(value) {
+  return /.+@.+\..+/.test(value);
+}
+
 async function createSession(username) {
   const sid = uuidv4();
   const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000);
@@ -61,24 +69,39 @@ async function getSessionUsername(req) {
   return session.username;
 }
 
-app.post("/api/login", async (req, res) => {
+app.post("/api/signup", async (req, res) => {
   const username = normalizeUsername(req.body.username);
+  const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || "");
 
-  if (!username || !password) {
-    return res.status(400).json({ error: "Username and password required." });
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: "Username, email, and password required." });
   }
 
-  const existing = await usersCollection.findOne({ username });
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ error: "Enter a valid email." });
+  }
 
+  const existing = await usersCollection.findOne({
+    $or: [{ username }, { email }]
+  });
   if (existing) {
-    const ok = await bcrypt.compare(password, existing.passwordHash);
-    if (!ok) {
-      return res.status(401).json({ error: "Invalid credentials." });
-    }
-  } else {
+    return res.status(409).json({ error: "Username or email already exists." });
+  }
+
+  try {
     const passwordHash = await bcrypt.hash(password, 10);
-    await usersCollection.insertOne({ username, passwordHash, createdAt: new Date() });
+    await usersCollection.insertOne({
+      username,
+      email,
+      passwordHash,
+      createdAt: new Date()
+    });
+  } catch (error) {
+    if (error && error.code === 11000) {
+      return res.status(409).json({ error: "Username or email already exists." });
+    }
+    return res.status(500).json({ error: "Could not create account." });
   }
 
   const sid = await createSession(username);
@@ -90,6 +113,39 @@ app.post("/api/login", async (req, res) => {
   });
 
   return res.json({ username });
+});
+
+app.post("/api/login", async (req, res) => {
+  const identifier = normalizeUsername(req.body.identifier);
+  const password = String(req.body.password || "");
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: "Username or email and password required." });
+  }
+
+  const lookup = identifier.includes("@")
+    ? { email: normalizeEmail(identifier) }
+    : { username: identifier };
+
+  const existing = await usersCollection.findOne(lookup);
+  if (!existing) {
+    return res.status(401).json({ error: "Invalid credentials." });
+  }
+
+  const ok = await bcrypt.compare(password, existing.passwordHash);
+  if (!ok) {
+    return res.status(401).json({ error: "Invalid credentials." });
+  }
+
+  const sid = await createSession(existing.username);
+  res.cookie("sid", sid, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: NODE_ENV === "production",
+    maxAge: 1000 * 60 * 60 * 12
+  });
+
+  return res.json({ username: existing.username });
 });
 
 app.post("/api/logout", (req, res) => {
@@ -194,6 +250,7 @@ async function start() {
   messagesCollection = db.collection("messages");
 
   await usersCollection.createIndex({ username: 1 }, { unique: true });
+  await usersCollection.createIndex({ email: 1 }, { unique: true });
   await sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await messagesCollection.createIndex({ ts: -1 });
 

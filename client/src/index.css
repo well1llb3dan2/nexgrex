@@ -106,6 +106,31 @@ body::after {
   gap: 18px;
 }
 
+.auth-toggle {
+  display: inline-flex;
+  gap: 8px;
+  background: rgba(10, 107, 107, 0.12);
+  padding: 6px;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.toggle {
+  border: none;
+  background: transparent;
+  color: var(--secondary);
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle.active {
+  background: var(--secondary);
+  color: #fff;
+  box-shadow: 0 10px 18px rgba(10, 107, 107, 0.3);
+}
+
 label {
   display: grid;
   gap: 8px;

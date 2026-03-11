@@ -29,6 +29,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
+  const activeRoomRef = useRef(null);
   const activeRoomData = rooms.find((room) => room.id === activeRoom);
   const now = Date.now();
 
@@ -84,6 +85,10 @@ export default function App() {
   }, [imageFile]);
 
   useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
+  useEffect(() => {
     if (status !== "logged-in") {
       return;
     }
@@ -91,7 +96,12 @@ export default function App() {
     const socket = io("/", socketOptions);
     socketRef.current = socket;
 
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => {
+      setConnected(true);
+      if (activeRoomRef.current) {
+        socket.emit("join-room", activeRoomRef.current);
+      }
+    });
     socket.on("disconnect", () => setConnected(false));
     socket.on("history", (payload) => {
       if (!payload || payload.roomId !== activeRoom) {
@@ -562,11 +572,16 @@ export default function App() {
               <div className="chat-header">
                 <div>
                   <h3>{activeRoomData ? activeRoomData.name : "Room chat"}</h3>
-                  <span className="room-id">{activeRoom}</span>
                 </div>
               </div>
 
               <div className="messages">
+                {messages.length === 0 && (
+                  <div className="empty-state">
+                    <h3>No messages yet</h3>
+                    <p>Start the conversation with a photo or hello.</p>
+                  </div>
+                )}
                 {messages.map((msg) => (
                   <div className="message" key={msg.id}>
                     <div className="meta">

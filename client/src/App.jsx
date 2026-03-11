@@ -104,7 +104,7 @@ export default function App() {
     });
     socket.on("disconnect", () => setConnected(false));
     socket.on("history", (payload) => {
-      if (!payload || payload.roomId !== activeRoom) {
+      if (!payload || payload.roomId !== activeRoomRef.current) {
         return;
       }
       if (Array.isArray(payload.messages)) {
@@ -112,7 +112,7 @@ export default function App() {
       }
     });
     socket.on("message", (message) => {
-      if (message.roomId !== activeRoom) {
+      if (message.roomId !== activeRoomRef.current) {
         return;
       }
       setMessages((prev) => [...prev, message]);

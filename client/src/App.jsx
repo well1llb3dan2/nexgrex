@@ -9,6 +9,7 @@ const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export default function App() {
   const [status, setStatus] = useState("checking");
+  const [view, setView] = useState("rooms");
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -17,6 +18,8 @@ export default function App() {
   const [activeUser, setActiveUser] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [theme, setTheme] = useState("atlas");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [roomName, setRoomName] = useState("");
   const [activeRoom, setActiveRoom] = useState(null);
@@ -30,8 +33,18 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
   const activeRoomRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const activeRoomData = rooms.find((room) => room.id === activeRoom);
   const now = Date.now();
+  const themes = [
+    { id: "atlas", label: "Atlas Drift" },
+    { id: "velvet", label: "Velvet Circuit" },
+    { id: "signal", label: "Signal Bloom" },
+    { id: "canyon", label: "Canyon Relay" },
+    { id: "glacier", label: "Glacier Echo" }
+  ];
+  const themeIds = new Set(themes.map((item) => item.id));
+  const normalizeTheme = (value) => (themeIds.has(value) ? value : "atlas");
 
   const getActivityBadge = (room) => {
     if (!room || !room.lastMessageAt) {
@@ -65,12 +78,18 @@ export default function App() {
       .then((data) => {
         setActiveUser(data.username);
         setAvatarUrl(data.avatarUrl || "");
+        setTheme(normalizeTheme(data.theme || "atlas"));
         setStatus("logged-in");
+        setView("rooms");
       })
       .catch(() => {
         setStatus("logged-out");
       });
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   useEffect(() => {
     if (!imageFile) {
@@ -130,8 +149,16 @@ export default function App() {
     if (!activeRoom || !socketRef.current) {
       return;
     }
+    activeRoomRef.current = activeRoom;
     socketRef.current.emit("join-room", activeRoom);
   }, [activeRoom]);
+
+  useEffect(() => {
+    if (!messagesEndRef.current) {
+      return;
+    }
+    messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [messages, activeRoom]);
 
   useEffect(() => {
     if (status !== "logged-in") {
@@ -175,7 +202,9 @@ export default function App() {
     const data = await res.json();
     setActiveUser(data.username);
     setAvatarUrl(data.avatarUrl || "");
+    setTheme(normalizeTheme(data.theme || "atlas"));
     setStatus("logged-in");
+    setView("rooms");
     setIdentifier("");
     setPassword("");
   };
@@ -200,7 +229,9 @@ export default function App() {
     const data = await res.json();
     setActiveUser(data.username);
     setAvatarUrl(data.avatarUrl || "");
+    setTheme(normalizeTheme(data.theme || "atlas"));
     setStatus("logged-in");
+    setView("rooms");
     setUsername("");
     setEmail("");
     setPassword("");
@@ -219,6 +250,9 @@ export default function App() {
     setImageFile(null);
     setImagePreview("");
     setActiveUser("");
+    setTheme("atlas");
+    setView("rooms");
+    setMenuOpen(false);
     setStatus("logged-out");
     setConnected(false);
   };
@@ -307,9 +341,87 @@ export default function App() {
     if (!room || !room.id) {
       return;
     }
-    setActiveRoom(room.id);
+    activeRoomRef.current = room.id;
+    if (socketRef.current) {
+      socketRef.current.emit("join-room", room.id);
+    }
+    if (activeRoom !== room.id) {
+      setActiveRoom(room.id);
+    }
     setMessages([]);
+    setView("chat");
+    setMenuOpen(false);
   };
+
+  const handleThemeChange = async (nextTheme) => {
+    setError("");
+    const res = await fetch("/api/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ theme: nextTheme })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Could not update theme.");
+      return;
+    }
+
+    const data = await res.json();
+    setTheme(data.theme || nextTheme);
+  };
+
+  const TitleBar = ({
+    title,
+    onBack,
+    showMenu,
+    onAvatarClick,
+    avatarDisabled
+  }) => (
+    <div className="title-bar">
+      <div className="title-left">
+        {onBack ? (
+          <button type="button" className="ghost back" onClick={onBack}>
+            Back
+          </button>
+        ) : (
+          <span />
+        )}
+      </div>
+      <div className="title-center">{title}</div>
+      <div className="title-right">
+        <button
+          type="button"
+          className="avatar-button"
+          onClick={avatarDisabled ? undefined : onAvatarClick}
+          disabled={avatarDisabled || !onAvatarClick}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Avatar" />
+          ) : (
+            <span>{activeUser ? activeUser[0]?.toUpperCase() : "?"}</span>
+          )}
+        </button>
+        {showMenu && (
+          <div className="menu">
+            <button
+              type="button"
+              onClick={() => {
+                setView("options");
+                setMenuOpen(false);
+              }}
+            >
+              Options
+            </button>
+            <button type="button" onClick={handleLogout}>
+              Log-out
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const handleSend = (event) => {
     event.preventDefault();
@@ -365,11 +477,13 @@ export default function App() {
 
   return (
     <div className="page">
-      <header className="hero">
-        <div className="badge">NEXGREX</div>
-        <h1>Networked Exchange for the Gregarious</h1>
-        <p>One room. One pulse. All of us together.</p>
-      </header>
+      {status !== "logged-in" && (
+        <header className="hero">
+          <div className="badge">NEXGREX</div>
+          <h1>Networked Exchange for the Gregarious</h1>
+          <p>One room. One pulse. All of us together.</p>
+        </header>
+      )}
 
       {status === "logged-out" && (
         <section className="card login">
@@ -462,29 +576,179 @@ export default function App() {
       )}
 
       {status === "logged-in" && (
-        <section className="card room-hub">
-          <div className="room-header">
-            <div>
-              <h2>NEXGREX Rooms</h2>
-              <p className="tagline">
-                Create a room, pull everyone in, and keep the thread moving.
-              </p>
-              <span className={connected ? "online" : "offline"}>
-                {connected ? "Connected" : "Offline"}
-              </span>
-            </div>
-            <div className="who">
-              <div className="profile">
-                <div className="avatar">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" />
-                  ) : (
-                    <span>{activeUser ? activeUser[0]?.toUpperCase() : "?"}</span>
+        <section className="card app-shell">
+          {view === "rooms" && (
+            <>
+              <TitleBar
+                title="NEXGREX"
+                onBack={null}
+                showMenu={menuOpen}
+                onAvatarClick={() => setMenuOpen((prev) => !prev)}
+              />
+              <div className="room-grid">
+                <div className="room-list">
+                  <div className="section-title">Available rooms</div>
+                  {roomsStatus === "loading" && <p>Loading rooms...</p>}
+                  {roomsStatus === "error" && (
+                    <p className="error">Could not load rooms.</p>
+                  )}
+                  {roomsStatus === "ready" && rooms.length === 0 && (
+                    <div className="empty-state">
+                      <h3>No rooms yet</h3>
+                      <p>Create the first room and set the tone.</p>
+                    </div>
+                  )}
+                  {rooms.length > 0 && (
+                    <div className="room-items">
+                      {rooms.map((room) => (
+                        <button
+                          key={room.id}
+                          type="button"
+                          className={
+                            activeRoom === room.id
+                              ? "room-chip active"
+                              : "room-chip"
+                          }
+                          onClick={() => handleJoinRoom(room)}
+                        >
+                          {(() => {
+                            const badge = getActivityBadge(room);
+                            return (
+                              <>
+                                <div className="room-chip-top">
+                                  <span>{room.name}</span>
+                                  {badge && (
+                                    <span className={`badge-pill ${badge.tone}`}>
+                                      {badge.label}
+                                    </span>
+                                  )}
+                                </div>
+                                <small>Created by {room.createdBy}</small>
+                              </>
+                            );
+                          })()}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className="profile-meta">
-                  <span>{activeUser}</span>
-                  <label className="avatar-upload">
+
+                <div className="room-create">
+                  <div className="section-title">Create a room</div>
+                  <form onSubmit={handleCreateRoom}>
+                    <label>
+                      Room name
+                      <input
+                        value={roomName}
+                        onChange={(event) => setRoomName(event.target.value)}
+                        placeholder="e.g. Morning coffee"
+                      />
+                    </label>
+                    {error && <p className="error">{error}</p>}
+                    <button type="submit" className="cta">
+                      Create room
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </>
+          )}
+
+          {view === "chat" && activeRoom && (
+            <>
+              <TitleBar
+                title={activeRoomData ? activeRoomData.name : "Room chat"}
+                onBack={() => setView("rooms")}
+                showMenu={menuOpen}
+                onAvatarClick={() => setMenuOpen((prev) => !prev)}
+              />
+              <div className="chat">
+                <div className="messages">
+                  {messages.length === 0 && (
+                    <div className="empty-state">
+                      <h3>No messages yet</h3>
+                      <p>Start the conversation with a photo or hello.</p>
+                    </div>
+                  )}
+                  {messages.map((msg) => (
+                    <div className="message" key={msg.id}>
+                      <div className="meta">
+                        <span className="user">{msg.user}</span>
+                        <span className="time">
+                          {new Date(msg.ts).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      {msg.text && <p>{msg.text}</p>}
+                      {msg.imageUrl && (
+                        <img
+                          className="message-image"
+                          src={msg.imageUrl}
+                          alt="Uploaded"
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <form className="composer" onSubmit={handleSend}>
+                  <div className="composer-input">
+                    <input
+                      value={text}
+                      onChange={(event) => setText(event.target.value)}
+                      placeholder="Say something bright"
+                    />
+                    {imagePreview && (
+                      <div className="image-preview">
+                        <img src={imagePreview} alt="Preview" />
+                        <button type="button" onClick={clearImage}>
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="composer-actions">
+                    <label className="ghost attach">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                    <label className="ghost attach">
+                      Camera
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                    <button type="submit" className="cta small" disabled={uploading}>
+                      {uploading ? "Sending..." : "Send"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </>
+          )}
+
+          {view === "options" && (
+            <>
+              <TitleBar
+                title="Options"
+                onBack={() => setView("rooms")}
+                showMenu={false}
+                onAvatarClick={null}
+                avatarDisabled
+              />
+              <div className="options">
+                <div className="section-title">Profile</div>
+                <div className="option-card">
+                  <span>Avatar</span>
+                  <label className="ghost attach">
                     {avatarUploading ? "Uploading..." : "Update avatar"}
                     <input
                       type="file"
@@ -495,150 +759,23 @@ export default function App() {
                     />
                   </label>
                 </div>
-              </div>
-              <button onClick={handleLogout} className="ghost">
-                Sign out
-              </button>
-            </div>
-          </div>
-
-          <div className="room-grid">
-            <div className="room-list">
-              <div className="section-title">Available rooms</div>
-              {roomsStatus === "loading" && <p>Loading rooms...</p>}
-              {roomsStatus === "error" && (
-                <p className="error">Could not load rooms.</p>
-              )}
-              {roomsStatus === "ready" && rooms.length === 0 && (
-                <div className="empty-state">
-                  <h3>No rooms yet</h3>
-                  <p>Create the first room and set the tone.</p>
-                </div>
-              )}
-              {rooms.length > 0 && (
-                <div className="room-items">
-                  {rooms.map((room) => (
+                <div className="section-title">Themes</div>
+                <div className="theme-grid">
+                  {themes.map((item) => (
                     <button
-                      key={room.id}
                       type="button"
-                      className={
-                        activeRoom === room.id ? "room-chip active" : "room-chip"
-                      }
-                      onClick={() => handleJoinRoom(room)}
+                      key={item.id}
+                      className={theme === item.id ? "theme-card active" : "theme-card"}
+                      onClick={() => handleThemeChange(item.id)}
                     >
-                      {(() => {
-                        const badge = getActivityBadge(room);
-                        return (
-                          <>
-                            <div className="room-chip-top">
-                              <span>{room.name}</span>
-                              {badge && (
-                                <span className={`badge-pill ${badge.tone}`}>
-                                  {badge.label}
-                                </span>
-                              )}
-                            </div>
-                            <small>Created by {room.createdBy}</small>
-                          </>
-                        );
-                      })()}
+                      <span>{item.label}</span>
+                      <small>{item.id}</small>
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-
-            <div className="room-create">
-              <div className="section-title">Create a room</div>
-              <form onSubmit={handleCreateRoom}>
-                <label>
-                  Room name
-                  <input
-                    value={roomName}
-                    onChange={(event) => setRoomName(event.target.value)}
-                    placeholder="e.g. Morning coffee"
-                  />
-                </label>
                 {error && <p className="error">{error}</p>}
-                <button type="submit" className="cta">
-                  Create room
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {activeRoom && (
-            <div className="chat">
-              <div className="chat-header">
-                <div>
-                  <h3>{activeRoomData ? activeRoomData.name : "Room chat"}</h3>
-                </div>
               </div>
-
-              <div className="messages">
-                {messages.length === 0 && (
-                  <div className="empty-state">
-                    <h3>No messages yet</h3>
-                    <p>Start the conversation with a photo or hello.</p>
-                  </div>
-                )}
-                {messages.map((msg) => (
-                  <div className="message" key={msg.id}>
-                    <div className="meta">
-                      <span className="user">{msg.user}</span>
-                      <span className="time">
-                        {new Date(msg.ts).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    {msg.text && <p>{msg.text}</p>}
-                    {msg.imageUrl && (
-                      <img
-                        className="message-image"
-                        src={msg.imageUrl}
-                        alt="Uploaded"
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <form className="composer" onSubmit={handleSend}>
-                <div className="composer-input">
-                  <input
-                    value={text}
-                    onChange={(event) => setText(event.target.value)}
-                    placeholder="Say something bright"
-                  />
-                  {imagePreview && (
-                    <div className="image-preview">
-                      <img src={imagePreview} alt="Preview" />
-                      <button type="button" onClick={clearImage}>
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="composer-actions">
-                  <label className="ghost attach">
-                    Upload
-                    <input type="file" accept="image/*" onChange={handleImageChange} />
-                  </label>
-                  <label className="ghost attach">
-                    Camera
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                  <button type="submit" className="cta small" disabled={uploading}>
-                    {uploading ? "Sending..." : "Send"}
-                  </button>
-                </div>
-              </form>
-            </div>
+            </>
           )}
         </section>
       )}

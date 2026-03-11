@@ -1,6 +1,7 @@
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "..", ".env") });
 const express = require("express");
 const http = require("http");
-const path = require("path");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const cookie = require("cookie");
@@ -23,6 +24,8 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET = process.env.R2_BUCKET;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const DEFAULT_THEME = "atlas";
+const THEMES = new Set(["atlas", "velvet", "signal", "canyon", "glacier"]);
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -191,6 +194,7 @@ app.post("/api/signup", async (req, res) => {
       email,
       passwordHash,
       avatarUrl: null,
+      theme: DEFAULT_THEME,
       createdAt: new Date()
     });
   } catch (error) {
@@ -208,7 +212,7 @@ app.post("/api/signup", async (req, res) => {
     maxAge: 1000 * 60 * 60 * 12
   });
 
-  return res.json({ username, avatarUrl: null });
+  return res.json({ username, avatarUrl: null, theme: DEFAULT_THEME });
 });
 
 app.post("/api/login", async (req, res) => {
@@ -241,7 +245,11 @@ app.post("/api/login", async (req, res) => {
     maxAge: 1000 * 60 * 60 * 12
   });
 
-  return res.json({ username: existing.username, avatarUrl: existing.avatarUrl || null });
+  return res.json({
+    username: existing.username,
+    avatarUrl: existing.avatarUrl || null,
+    theme: existing.theme || DEFAULT_THEME
+  });
 });
 
 app.post("/api/logout", (req, res) => {
@@ -261,10 +269,31 @@ app.get("/api/me", (req, res) => {
       }
       return usersCollection
         .findOne({ username })
-        .then((user) => res.json({ username, avatarUrl: user ? user.avatarUrl || null : null }))
+        .then((user) =>
+          res.json({
+            username,
+            avatarUrl: user ? user.avatarUrl || null : null,
+            theme: user ? user.theme || DEFAULT_THEME : DEFAULT_THEME
+          })
+        )
         .catch(() => res.status(500).json({ error: "Server error." }));
     })
     .catch(() => res.status(500).json({ error: "Server error." }));
+});
+
+app.patch("/api/preferences", async (req, res) => {
+  const username = await requireUser(req, res);
+  if (!username) {
+    return;
+  }
+
+  const theme = String(req.body.theme || "").trim();
+  if (!theme || !THEMES.has(theme)) {
+    return res.status(400).json({ error: "Invalid theme." });
+  }
+
+  await usersCollection.updateOne({ username }, { $set: { theme } });
+  return res.json({ theme });
 });
 
 app.post("/api/upload", upload.single("file"), async (req, res) => {

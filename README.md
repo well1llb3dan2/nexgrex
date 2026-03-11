@@ -24,6 +24,8 @@ PowerShell:
 $env:MONGODB_URI="your-connection-string"
 ```
 
+Or create a local `.env` file (see `.env.example`) at the project root.
+
 Run in development (client + server):
 
 ```

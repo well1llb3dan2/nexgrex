@@ -186,6 +186,130 @@ input {
   gap: 18px;
 }
 
+.room-hub {
+  display: grid;
+  gap: 24px;
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.room-header h2 {
+  margin: 0;
+}
+
+.tagline {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.room-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.room-list,
+.room-create {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  padding: 20px;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  display: grid;
+  gap: 14px;
+}
+
+.section-title {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.room-items {
+  display: grid;
+  gap: 10px;
+}
+
+.room-chip {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(26, 26, 26, 0.12);
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.room-chip-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.badge-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(10, 107, 107, 0.12);
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+.badge-pill.hot {
+  background: rgba(200, 87, 46, 0.18);
+  color: #9b2d1c;
+}
+
+.badge-pill.warm {
+  background: rgba(255, 194, 110, 0.35);
+  color: #8a4d0f;
+}
+
+.badge-pill.cool {
+  background: rgba(10, 107, 107, 0.12);
+  color: var(--secondary);
+}
+
+.room-chip small {
+  color: var(--muted);
+}
+
+.room-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 18px rgba(26, 26, 26, 0.12);
+}
+
+.room-chip.active {
+  border-color: var(--secondary);
+  box-shadow: 0 12px 20px rgba(10, 107, 107, 0.2);
+}
+
+.empty-state {
+  background: rgba(10, 107, 107, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.empty-state h3 {
+  margin: 0 0 6px;
+}
+
+.room-id {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .chat-header {
   display: flex;
   justify-content: space-between;
@@ -203,6 +327,45 @@ input {
   gap: 12px;
   align-items: center;
   font-weight: 600;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(10, 107, 107, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.avatar-upload {
+  font-size: 0.8rem;
+  color: var(--secondary);
+  cursor: pointer;
+}
+
+.avatar-upload input {
+  display: none;
 }
 
 .online {
@@ -243,10 +406,68 @@ input {
   line-height: 1.4;
 }
 
+.message-image {
+  margin-top: 10px;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+}
+
 .composer {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
+}
+
+.composer-input {
+  display: grid;
+  gap: 10px;
+}
+
+.composer-actions {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.attach {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+
+.attach input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.image-preview {
+  background: rgba(10, 107, 107, 0.08);
+  padding: 10px;
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.image-preview img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.image-preview button {
+  align-self: start;
+  border: none;
+  background: transparent;
+  color: var(--secondary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
 }
 
 .status {
@@ -258,11 +479,23 @@ input {
     padding: 32px 14px 60px;
   }
 
+  .hero p {
+    display: none;
+  }
+
   .card {
     padding: 22px;
   }
 
+  .room-grid {
+    grid-template-columns: 1fr;
+  }
+
   .composer {
     grid-template-columns: 1fr;
+  }
+
+  .composer-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

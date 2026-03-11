@@ -45,3 +45,10 @@ The server will serve the client build from client/dist.
 ## Notes
 - Set `MONGODB_URI` in Render environment variables.
 - Sessions expire after 12 hours.
+- Image uploads use Cloudflare R2. Set these env vars in Render:
+	- `R2_ENDPOINT`
+	- `R2_ACCESS_KEY_ID`
+	- `R2_SECRET_ACCESS_KEY`
+	- `R2_BUCKET`
+	- `R2_PUBLIC_URL`
+- Max image size is 12 MB (supports 4k images without additional compression).

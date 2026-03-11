@@ -5,6 +5,8 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const cookie = require("cookie");
 const bcrypt = require("bcryptjs");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const multer = require("multer");
 const { MongoClient } = require("mongodb");
 const { v4: uuidv4 } = require("uuid");
 const { Server } = require("socket.io");
@@ -15,6 +17,20 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB || "nexgrex";
 const SESSION_HOURS = 12;
+const R2_ENDPOINT = process.env.R2_ENDPOINT;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET = process.env.R2_BUCKET;
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif"
+]);
 
 const app = express();
 const server = http.createServer(app);
@@ -25,9 +41,15 @@ const io = new Server(server, {
   }
 });
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_BYTES }
+});
+
 let usersCollection;
 let sessionsCollection;
 let messagesCollection;
+let roomsCollection;
 
 app.use(cors({
   origin: CLIENT_ORIGIN,
@@ -46,6 +68,65 @@ function normalizeEmail(value) {
 
 function isValidEmail(value) {
   return /.+@.+\..+/.test(value);
+}
+
+function ensureR2Config() {
+  if (!R2_ENDPOINT || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET || !R2_PUBLIC_URL) {
+    throw new Error("Missing R2 configuration.");
+  }
+}
+
+function getFileExtension(mimeType) {
+  switch (mimeType) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    case "image/heic":
+      return "heic";
+    case "image/heif":
+      return "heif";
+    default:
+      return null;
+  }
+}
+
+async function uploadImageToR2(file, prefix) {
+  ensureR2Config();
+  const ext = getFileExtension(file.mimetype);
+  if (!ext || !ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+    const error = new Error("Unsupported image type.");
+    error.code = "UNSUPPORTED_TYPE";
+    throw error;
+  }
+
+  const key = `${prefix}/${uuidv4()}.${ext}`;
+  const client = new S3Client({
+    region: "auto",
+    endpoint: R2_ENDPOINT,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY
+    }
+  });
+
+  await client.send(new PutObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype
+  }));
+
+  const baseUrl = String(R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  return {
+    url: `${baseUrl}/${key}`,
+    contentType: file.mimetype,
+    size: file.size
+  };
 }
 
 async function createSession(username) {
@@ -67,6 +148,20 @@ async function getSessionUsername(req) {
   }
 
   return session.username;
+}
+
+async function requireUser(req, res) {
+  try {
+    const username = await getSessionUsername(req);
+    if (!username) {
+      res.status(401).json({ error: "Not signed in." });
+      return null;
+    }
+    return username;
+  } catch (error) {
+    res.status(500).json({ error: "Server error." });
+    return null;
+  }
 }
 
 app.post("/api/signup", async (req, res) => {
@@ -95,6 +190,7 @@ app.post("/api/signup", async (req, res) => {
       username,
       email,
       passwordHash,
+      avatarUrl: null,
       createdAt: new Date()
     });
   } catch (error) {
@@ -112,7 +208,7 @@ app.post("/api/signup", async (req, res) => {
     maxAge: 1000 * 60 * 60 * 12
   });
 
-  return res.json({ username });
+  return res.json({ username, avatarUrl: null });
 });
 
 app.post("/api/login", async (req, res) => {
@@ -145,7 +241,7 @@ app.post("/api/login", async (req, res) => {
     maxAge: 1000 * 60 * 60 * 12
   });
 
-  return res.json({ username: existing.username });
+  return res.json({ username: existing.username, avatarUrl: existing.avatarUrl || null });
 });
 
 app.post("/api/logout", (req, res) => {
@@ -163,9 +259,102 @@ app.get("/api/me", (req, res) => {
       if (!username) {
         return res.status(401).json({ error: "Not signed in." });
       }
-      return res.json({ username });
+      return usersCollection
+        .findOne({ username })
+        .then((user) => res.json({ username, avatarUrl: user ? user.avatarUrl || null : null }))
+        .catch(() => res.status(500).json({ error: "Server error." }));
     })
     .catch(() => res.status(500).json({ error: "Server error." }));
+});
+
+app.post("/api/upload", upload.single("file"), async (req, res) => {
+  const username = await requireUser(req, res);
+  if (!username) {
+    return;
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: "File required." });
+  }
+
+  try {
+    const result = await uploadImageToR2(req.file, "uploads");
+    return res.json({ url: result.url, contentType: result.contentType, size: result.size });
+  } catch (error) {
+    if (error && error.code === "UNSUPPORTED_TYPE") {
+      return res.status(400).json({ error: "Unsupported image type." });
+    }
+    return res.status(500).json({ error: "Upload failed." });
+  }
+});
+
+app.post("/api/avatar", upload.single("file"), async (req, res) => {
+  const username = await requireUser(req, res);
+  if (!username) {
+    return;
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: "File required." });
+  }
+
+  try {
+    const result = await uploadImageToR2(req.file, "avatars");
+    await usersCollection.updateOne(
+      { username },
+      { $set: { avatarUrl: result.url, avatarUpdatedAt: new Date() } }
+    );
+    return res.json({ avatarUrl: result.url });
+  } catch (error) {
+    if (error && error.code === "UNSUPPORTED_TYPE") {
+      return res.status(400).json({ error: "Unsupported image type." });
+    }
+    return res.status(500).json({ error: "Avatar upload failed." });
+  }
+});
+
+app.get("/api/rooms", async (req, res) => {
+  const username = await requireUser(req, res);
+  if (!username) {
+    return;
+  }
+
+  const rooms = await roomsCollection
+    .find({})
+    .sort({ createdAt: 1 })
+    .project({ _id: 0 })
+    .toArray();
+  res.json({ rooms });
+});
+
+app.post("/api/rooms", async (req, res) => {
+  const username = await requireUser(req, res);
+  if (!username) {
+    return;
+  }
+
+  const name = String(req.body.name || "").trim();
+  if (!name) {
+    return res.status(400).json({ error: "Room name required." });
+  }
+
+  const room = {
+    id: uuidv4(),
+    name: name.slice(0, 80),
+    createdBy: username,
+    createdAt: Date.now(),
+    lastMessageAt: null
+  };
+
+  try {
+    await roomsCollection.insertOne(room);
+    return res.status(201).json({ room });
+  } catch (error) {
+    if (error && error.code === 11000) {
+      return res.status(409).json({ error: "Room name already exists." });
+    }
+    return res.status(500).json({ error: "Could not create room." });
+  }
 });
 
 if (NODE_ENV === "production") {
@@ -198,38 +387,71 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  socket.join("global");
-  messagesCollection
-    .find({})
-    .sort({ ts: -1 })
-    .limit(200)
-    .toArray()
-    .then((docs) => {
-      socket.emit("history", docs.reverse());
-    })
-    .catch(() => {
-      socket.emit("history", []);
-    });
-
-  socket.on("message", async (text) => {
-    if (typeof text !== "string") {
+  socket.on("join-room", async (roomId) => {
+    if (!roomId) {
       return;
     }
+    const room = await roomsCollection.findOne({ id: roomId });
+    if (!room) {
+      return;
+    }
+
+    if (socket.data.activeRoom) {
+      socket.leave(socket.data.activeRoom);
+    }
+
+    socket.data.activeRoom = roomId;
+    socket.join(roomId);
+
+    messagesCollection
+      .find({ roomId })
+      .sort({ ts: -1 })
+      .limit(200)
+      .toArray()
+      .then((docs) => {
+        socket.emit("history", { roomId, messages: docs.reverse() });
+      })
+      .catch(() => {
+        socket.emit("history", { roomId, messages: [] });
+      });
+  });
+
+  socket.on("message", async (payload) => {
+    if (!payload) {
+      return;
+    }
+
+    const roomId = payload.roomId;
+    if (!roomId) {
+      return;
+    }
+
+    const text = typeof payload.text === "string" ? payload.text : "";
     const trimmed = text.trim().slice(0, 500);
-    if (!trimmed) {
+    const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : null;
+    const imageType = typeof payload.imageType === "string" ? payload.imageType : null;
+
+    if (!trimmed && !imageUrl) {
       return;
     }
 
     const msg = {
       id: uuidv4(),
+      roomId,
       user: socket.data.username,
       text: trimmed,
+      imageUrl,
+      imageType,
       ts: Date.now()
     };
 
     try {
       await messagesCollection.insertOne(msg);
-      io.to("global").emit("message", msg);
+      await roomsCollection.updateOne(
+        { id: roomId },
+        { $set: { lastMessageAt: msg.ts } }
+      );
+      io.to(roomId).emit("message", msg);
     } catch (error) {
       socket.emit("error", "Message failed to save.");
     }
@@ -248,11 +470,14 @@ async function start() {
   usersCollection = db.collection("users");
   sessionsCollection = db.collection("sessions");
   messagesCollection = db.collection("messages");
+  roomsCollection = db.collection("rooms");
 
   await usersCollection.createIndex({ username: 1 }, { unique: true });
   await usersCollection.createIndex({ email: 1 }, { unique: true });
   await sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await messagesCollection.createIndex({ ts: -1 });
+  await messagesCollection.createIndex({ roomId: 1, ts: -1 });
+  await roomsCollection.createIndex({ name: 1 }, { unique: true });
 
   server.listen(PORT, () => {
     console.log(`NEXGREX server listening on ${PORT}`);

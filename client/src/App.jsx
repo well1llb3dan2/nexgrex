@@ -5,6 +5,7 @@ const socketOptions = {
   autoConnect: false,
   withCredentials: true
 };
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export default function App() {
   const [status, setStatus] = useState("checking");
@@ -14,11 +15,43 @@ export default function App() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [activeUser, setActiveUser] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [rooms, setRooms] = useState([]);
+  const [roomName, setRoomName] = useState("");
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [roomsStatus, setRoomsStatus] = useState("idle");
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
+  const activeRoomData = rooms.find((room) => room.id === activeRoom);
+  const now = Date.now();
+
+  const getActivityBadge = (room) => {
+    if (!room || !room.lastMessageAt) {
+      return null;
+    }
+    const diff = now - room.lastMessageAt;
+    const tenMinutes = 10 * 60 * 1000;
+    const twelveHours = 12 * 60 * 60 * 1000;
+    const fortyEightHours = 48 * 60 * 60 * 1000;
+
+    if (diff <= tenMinutes) {
+      return { label: "Active 10m", tone: "hot" };
+    }
+    if (diff <= twelveHours) {
+      return { label: "Active 12h", tone: "warm" };
+    }
+    if (diff <= fortyEightHours) {
+      return { label: "Active 48h", tone: "cool" };
+    }
+    return null;
+  };
 
   useEffect(() => {
     fetch("/api/me", { credentials: "include" })
@@ -30,12 +63,25 @@ export default function App() {
       })
       .then((data) => {
         setActiveUser(data.username);
+        setAvatarUrl(data.avatarUrl || "");
         setStatus("logged-in");
       })
       .catch(() => {
         setStatus("logged-out");
       });
   }, []);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreview(previewUrl);
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [imageFile]);
 
   useEffect(() => {
     if (status !== "logged-in") {
@@ -47,12 +93,18 @@ export default function App() {
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
-    socket.on("history", (history) => {
-      if (Array.isArray(history)) {
-        setMessages(history);
+    socket.on("history", (payload) => {
+      if (!payload || payload.roomId !== activeRoom) {
+        return;
+      }
+      if (Array.isArray(payload.messages)) {
+        setMessages(payload.messages);
       }
     });
     socket.on("message", (message) => {
+      if (message.roomId !== activeRoom) {
+        return;
+      }
       setMessages((prev) => [...prev, message]);
     });
 
@@ -62,6 +114,35 @@ export default function App() {
       socket.disconnect();
       socketRef.current = null;
     };
+  }, [status]);
+
+  useEffect(() => {
+    if (!activeRoom || !socketRef.current) {
+      return;
+    }
+    socketRef.current.emit("join-room", activeRoom);
+  }, [activeRoom]);
+
+  useEffect(() => {
+    if (status !== "logged-in") {
+      return;
+    }
+
+    setRoomsStatus("loading");
+    fetch("/api/rooms", { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error("failed");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setRooms(Array.isArray(data.rooms) ? data.rooms : []);
+        setRoomsStatus("ready");
+      })
+      .catch(() => {
+        setRoomsStatus("error");
+      });
   }, [status]);
 
   const handleLogin = async (event) => {
@@ -83,6 +164,7 @@ export default function App() {
 
     const data = await res.json();
     setActiveUser(data.username);
+    setAvatarUrl(data.avatarUrl || "");
     setStatus("logged-in");
     setIdentifier("");
     setPassword("");
@@ -107,6 +189,7 @@ export default function App() {
 
     const data = await res.json();
     setActiveUser(data.username);
+    setAvatarUrl(data.avatarUrl || "");
     setStatus("logged-in");
     setUsername("");
     setEmail("");
@@ -119,18 +202,155 @@ export default function App() {
       credentials: "include"
     });
     setMessages([]);
+    setRooms([]);
+    setActiveRoom(null);
+    setRoomName("");
+    setAvatarUrl("");
+    setImageFile(null);
+    setImagePreview("");
     setActiveUser("");
     setStatus("logged-out");
     setConnected(false);
   };
 
-  const handleSend = (event) => {
-    event.preventDefault();
-    if (!text.trim() || !socketRef.current) {
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) {
       return;
     }
-    socketRef.current.emit("message", text);
-    setText("");
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("Avatar must be 12 MB or smaller.");
+      return;
+    }
+    setError("");
+    setAvatarUploading(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/avatar", {
+      method: "POST",
+      credentials: "include",
+      body: formData
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Avatar upload failed.");
+      setAvatarUploading(false);
+      return;
+    }
+
+    const data = await res.json();
+    setAvatarUrl(data.avatarUrl || "");
+    setAvatarUploading(false);
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("Images must be 12 MB or smaller.");
+      return;
+    }
+    setImageFile(file);
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+  };
+
+  const handleCreateRoom = async (event) => {
+    event.preventDefault();
+    setError("");
+    const name = roomName.trim();
+    if (!name) {
+      setError("Room name required.");
+      return;
+    }
+
+    const res = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Could not create room.");
+      return;
+    }
+
+    const data = await res.json();
+    const room = data.room;
+    setRooms((prev) => [...prev, room]);
+    setRoomName("");
+  };
+
+  const handleJoinRoom = (room) => {
+    if (!room || !room.id) {
+      return;
+    }
+    setActiveRoom(room.id);
+    setMessages([]);
+  };
+
+  const handleSend = (event) => {
+    event.preventDefault();
+    if (!socketRef.current || !activeRoom || uploading) {
+      return;
+    }
+
+    const trimmed = text.trim();
+    if (!trimmed && !imageFile) {
+      return;
+    }
+
+    const sendMessage = (imagePayload) => {
+      socketRef.current.emit("message", {
+        roomId: activeRoom,
+        text: trimmed,
+        imageUrl: imagePayload ? imagePayload.url : null,
+        imageType: imagePayload ? imagePayload.contentType : null
+      });
+      setText("");
+      clearImage();
+    };
+
+    if (imageFile) {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      fetch("/api/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || "Upload failed.");
+          }
+          return res.json();
+        })
+        .then((data) => {
+          sendMessage(data);
+          setUploading(false);
+        })
+        .catch((err) => {
+          setError(err.message || "Upload failed.");
+          setUploading(false);
+        });
+      return;
+    }
+
+    sendMessage(null);
   };
 
   return (
@@ -232,46 +452,179 @@ export default function App() {
       )}
 
       {status === "logged-in" && (
-        <section className="card chat">
-          <div className="chat-header">
+        <section className="card room-hub">
+          <div className="room-header">
             <div>
-              <h2>Global Room</h2>
+              <h2>NEXGREX Rooms</h2>
+              <p className="tagline">
+                Create a room, pull everyone in, and keep the thread moving.
+              </p>
               <span className={connected ? "online" : "offline"}>
                 {connected ? "Connected" : "Offline"}
               </span>
             </div>
             <div className="who">
-              <span>{activeUser}</span>
+              <div className="profile">
+                <div className="avatar">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" />
+                  ) : (
+                    <span>{activeUser ? activeUser[0]?.toUpperCase() : "?"}</span>
+                  )}
+                </div>
+                <div className="profile-meta">
+                  <span>{activeUser}</span>
+                  <label className="avatar-upload">
+                    {avatarUploading ? "Uploading..." : "Update avatar"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleAvatarChange}
+                      disabled={avatarUploading}
+                    />
+                  </label>
+                </div>
+              </div>
               <button onClick={handleLogout} className="ghost">
                 Sign out
               </button>
             </div>
           </div>
 
-          <div className="messages">
-            {messages.map((msg) => (
-              <div className="message" key={msg.id}>
-                <div className="meta">
-                  <span className="user">{msg.user}</span>
-                  <span className="time">
-                    {new Date(msg.ts).toLocaleTimeString()}
-                  </span>
+          <div className="room-grid">
+            <div className="room-list">
+              <div className="section-title">Available rooms</div>
+              {roomsStatus === "loading" && <p>Loading rooms...</p>}
+              {roomsStatus === "error" && (
+                <p className="error">Could not load rooms.</p>
+              )}
+              {roomsStatus === "ready" && rooms.length === 0 && (
+                <div className="empty-state">
+                  <h3>No rooms yet</h3>
+                  <p>Create the first room and set the tone.</p>
                 </div>
-                <p>{msg.text}</p>
-              </div>
-            ))}
+              )}
+              {rooms.length > 0 && (
+                <div className="room-items">
+                  {rooms.map((room) => (
+                    <button
+                      key={room.id}
+                      type="button"
+                      className={
+                        activeRoom === room.id ? "room-chip active" : "room-chip"
+                      }
+                      onClick={() => handleJoinRoom(room)}
+                    >
+                      {(() => {
+                        const badge = getActivityBadge(room);
+                        return (
+                          <>
+                            <div className="room-chip-top">
+                              <span>{room.name}</span>
+                              {badge && (
+                                <span className={`badge-pill ${badge.tone}`}>
+                                  {badge.label}
+                                </span>
+                              )}
+                            </div>
+                            <small>Created by {room.createdBy}</small>
+                          </>
+                        );
+                      })()}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="room-create">
+              <div className="section-title">Create a room</div>
+              <form onSubmit={handleCreateRoom}>
+                <label>
+                  Room name
+                  <input
+                    value={roomName}
+                    onChange={(event) => setRoomName(event.target.value)}
+                    placeholder="e.g. Morning coffee"
+                  />
+                </label>
+                {error && <p className="error">{error}</p>}
+                <button type="submit" className="cta">
+                  Create room
+                </button>
+              </form>
+            </div>
           </div>
 
-          <form className="composer" onSubmit={handleSend}>
-            <input
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Say something bright"
-            />
-            <button type="submit" className="cta small">
-              Send
-            </button>
-          </form>
+          {activeRoom && (
+            <div className="chat">
+              <div className="chat-header">
+                <div>
+                  <h3>{activeRoomData ? activeRoomData.name : "Room chat"}</h3>
+                  <span className="room-id">{activeRoom}</span>
+                </div>
+              </div>
+
+              <div className="messages">
+                {messages.map((msg) => (
+                  <div className="message" key={msg.id}>
+                    <div className="meta">
+                      <span className="user">{msg.user}</span>
+                      <span className="time">
+                        {new Date(msg.ts).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    {msg.text && <p>{msg.text}</p>}
+                    {msg.imageUrl && (
+                      <img
+                        className="message-image"
+                        src={msg.imageUrl}
+                        alt="Uploaded"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <form className="composer" onSubmit={handleSend}>
+                <div className="composer-input">
+                  <input
+                    value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    placeholder="Say something bright"
+                  />
+                  {imagePreview && (
+                    <div className="image-preview">
+                      <img src={imagePreview} alt="Preview" />
+                      <button type="button" onClick={clearImage}>
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="composer-actions">
+                  <label className="ghost attach">
+                    Upload
+                    <input type="file" accept="image/*" onChange={handleImageChange} />
+                  </label>
+                  <label className="ghost attach">
+                    Camera
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                  <button type="submit" className="cta small" disabled={uploading}>
+                    {uploading ? "Sending..." : "Send"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </section>
       )}
     </div>

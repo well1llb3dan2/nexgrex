@@ -652,12 +652,12 @@ export default function App() {
                 <div className="invite-display">
                   <p className="invite-label">Share this invite link:</p>
                   <div className="invite-token-container">
-                    <code className="invite-token">{inviteToken}</code>
+                    <code className="invite-token">{`${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`}</code>
                     <button
                       type="button"
                       className="ghost small"
                       onClick={() => {
-                        navigator.clipboard.writeText(inviteToken);
+                        navigator.clipboard.writeText(`${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`);
                         setInviteToken("");
                       }}
                     >

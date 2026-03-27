@@ -370,15 +370,45 @@ export default function App() {
         </button>
         {showMenu && (
           <div className="menu">
-            <button
-              type="button"
-              onClick={() => {
-                setView("options");
-                setMenuOpen(false);
-              }}
-            >
-              Options
-            </button>
+            {/* Profile Section */}
+            <div className="menu-section">
+              <div className="menu-label">👤 Profile</div>
+              <label className="menu-upload">
+                {avatarUploading ? "Uploading..." : "📸 Update avatar"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleAvatarChange}
+                  disabled={avatarUploading}
+                />
+              </label>
+            </div>
+
+            {/* Themes Section */}
+            <div className="menu-section">
+              <div className="menu-label">🎨 Theme</div>
+              <div className="menu-themes">
+                {themes.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={theme === item.id ? "menu-theme-btn active" : "menu-theme-btn"}
+                    onClick={() => {
+                      handleThemeChange(item.id);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="menu-divider" />
+
+            {/* Actions */}
             <button
               type="button"
               onClick={() => {
@@ -386,8 +416,9 @@ export default function App() {
                 setMenuOpen(false);
               }}
               disabled={inviteLoading}
+              className="menu-action"
             >
-              {inviteLoading ? "Generating..." : "Generate Invite"}
+              {inviteLoading ? "Generating..." : "🔗 Generate Invite"}
             </button>
             <button
               type="button"
@@ -395,8 +426,9 @@ export default function App() {
                 await handleLogout();
                 setMenuOpen(false);
               }}
+              className="menu-action"
             >
-              Log-out
+              ✌️ Log-out
             </button>
           </div>
         )}

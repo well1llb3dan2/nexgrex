@@ -556,18 +556,109 @@
     position: absolute;
     top: 60px;
     right: 0;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 6px;
     background: var(--surface-strong);
     padding: 12px;
     border-radius: var(--radius-soft);
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
     border: var(--border-width) solid var(--border-color);
-    min-width: 150px;
+    min-width: 180px;
+    max-width: 280px;
     z-index: 5;
     animation: slideDown 0.2s var(--ease-bounce);
+    max-height: 70vh;
+    overflow-y: auto;
 
-    button {
+    .menu-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 0;
+    }
+
+    .menu-label {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 12px;
+    }
+
+    .menu-upload {
+      display: block;
+      text-align: center;
+      border: none;
+      background: var(--surface-muted);
+      text-align: center;
+      font-weight: 600;
+      color: var(--secondary);
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      font-size: 0.9rem;
+
+      input {
+        display: none;
+      }
+
+      &:hover {
+        background: var(--secondary);
+        color: var(--surface-strong);
+        transform: translateY(-1px);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+    }
+
+    .menu-themes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 0 12px;
+    }
+
+    .menu-theme-btn {
+      border: 1px solid var(--border-color);
+      background: var(--surface-muted);
+      text-align: center;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      font-size: 0.75rem;
+
+      &:hover {
+        background: var(--secondary);
+        color: var(--surface-strong);
+        transform: translateY(-1px);
+      }
+
+      &.active {
+        background: var(--primary);
+        color: var(--surface-strong);
+        border-color: var(--primary);
+        font-weight: 700;
+      }
+    }
+
+    .menu-divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 6px 0;
+    }
+
+    .menu-action {
       border: none;
       background: transparent;
       text-align: left;
@@ -582,6 +673,11 @@
       &:hover {
         background: var(--surface-muted);
         transform: translateX(2px);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
       }
     }
   }

@@ -402,7 +402,10 @@ export default function App() {
 
   const handleDownloadImage = async (imageUrl) => {
     try {
-      const response = await fetch(imageUrl);
+      // Use server proxy to bypass CORS
+      const proxyUrl = `/api/download?url=${encodeURIComponent(imageUrl)}`;
+      const response = await fetch(proxyUrl, { credentials: "include" });
+      
       if (!response.ok) {
         throw new Error("Failed to download image");
       }

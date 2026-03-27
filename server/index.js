@@ -480,6 +480,36 @@ app.post("/api/avatar", upload.single("file"), async (req, res) => {
   }
 });
 
+// Download image endpoint - bypasses CORS by proxying through same origin
+app.get("/api/download", async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({ error: "URL required." });
+    }
+    
+    // Validate that URL is from our R2 bucket
+    if (!url.startsWith(R2_PUBLIC_URL)) {
+      return res.status(403).json({ error: "Invalid URL." });
+    }
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: "Failed to fetch image." });
+    }
+    
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const buffer = await response.arrayBuffer();
+    
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="nexgrex-image-${Date.now()}.jpg"`);
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Download error:", error);
+    return res.status(500).json({ error: "Download failed." });
+  }
+});
 
 
 if (NODE_ENV === "production") {

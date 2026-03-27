@@ -8,7 +8,7 @@
   "id": "nexgrex-app",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "dir": "ltr",
   "lang": "en-US",
   "background_color": "#ffffff",

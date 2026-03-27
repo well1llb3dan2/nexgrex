@@ -44,6 +44,7 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const qrRef = useRef(null);
@@ -699,6 +700,7 @@ export default function App() {
                           src={msg.imageUrl}
                           alt="Uploaded"
                           loading="lazy"
+                          onClick={() => setSelectedImageUrl(msg.imageUrl)}
                         />
                       )}
                     </div>
@@ -747,6 +749,42 @@ export default function App() {
                 </form>
               </div>
             </>
+          )}
+
+          {/* Image Lightbox Modal */}
+          {selectedImageUrl && (
+            <div className="lightbox-overlay" onClick={() => setSelectedImageUrl(null)}>
+              <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="lightbox-close"
+                  onClick={() => setSelectedImageUrl(null)}
+                >
+                  ✕
+                </button>
+                <img src={selectedImageUrl} alt="Full view" className="lightbox-image" />
+                <div className="lightbox-actions">
+                  <a
+                    href={selectedImageUrl}
+                    download
+                    className="ghost"
+                  >
+                    📥 Download
+                  </a>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedImageUrl);
+                      setError("Image URL copied!");
+                      setTimeout(() => setError(""), 2000);
+                    }}
+                  >
+                    🔗 Copy URL
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {view === "options" && (

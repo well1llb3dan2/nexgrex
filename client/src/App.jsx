@@ -11,11 +11,11 @@ const GLOBAL_ROOM_ID = "global";
 
 // Theme color mapping for QR codes
 const themeColors = {
-  atlas: { primary: "#2b5d8a", bg: "#eef1f6" },
-  velvet: { primary: "#8b2f2f", bg: "#f6eee8" },
-  signal: { primary: "#5b0a82", bg: "#f3e8fc" },
-  canyon: { primary: "#b8592d", bg: "#f9e4d4" },
-  glacier: { primary: "#0d5c6e", bg: "#e8f4f8" }
+  "neon-dreams": { primary: "#ff006e", bg: "#0a0e27" },
+  "vintage-groove": { primary: "#d2691e", bg: "#f5d5a8" },
+  "ocean-zen": { primary: "#0284c7", bg: "#e0f2fe" },
+  "sunset-blaze": { primary: "#f97316", bg: "#fef3c7" },
+  "royal-arcade": { primary: "#a855f7", bg: "#faf5ff" }
 };
 
 export default function App() {
@@ -30,7 +30,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [theme, setTheme] = useState("atlas");
+  const [theme, setTheme] = useState("neon-dreams");
   const [menuOpen, setMenuOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -45,14 +45,14 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const qrRef = useRef(null);
   const themes = [
-    { id: "atlas", label: "Atlas Drift" },
-    { id: "velvet", label: "Velvet Circuit" },
-    { id: "signal", label: "Signal Bloom" },
-    { id: "canyon", label: "Canyon Relay" },
-    { id: "glacier", label: "Glacier Echo" }
+    { id: "neon-dreams", label: "✨ Neon Dreams" },
+    { id: "vintage-groove", label: "🎨 Vintage Groove" },
+    { id: "ocean-zen", label: "🌊 Ocean Zen" },
+    { id: "sunset-blaze", label: "🔥 Sunset Blaze" },
+    { id: "royal-arcade", label: "🎮 Royal Arcade" }
   ];
   const themeIds = new Set(themes.map((item) => item.id));
-  const normalizeTheme = (value) => (themeIds.has(value) ? value : "atlas");
+  const normalizeTheme = (value) => (themeIds.has(value) ? value : "neon-dreams");
 
   useEffect(() => {
     // Check for invite token in URL
@@ -73,7 +73,7 @@ export default function App() {
       .then((data) => {
         setActiveUser(data.username);
         setAvatarUrl(data.avatarUrl || "");
-        setTheme(normalizeTheme(data.theme || "atlas"));
+        setTheme(normalizeTheme(data.theme || "neon-dreams"));
         setStatus("logged-in");
         setView("chat");
       })

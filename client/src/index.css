@@ -725,8 +725,11 @@ input::placeholder {
   gap: 14px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 6px;
   min-height: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .message {
@@ -769,6 +772,8 @@ input::placeholder {
   line-height: 1.5;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .message-image {
@@ -879,49 +884,86 @@ input::placeholder {
 
 @media (max-width: 400px) {
   .page {
-    padding: 8px 8px 8px;
+    padding: 6px 6px 6px;
   }
 
   .card {
-    padding: 16px;
+    padding: 14px;
+    border-radius: var(--radius-soft);
   }
 
   .title-bar {
-    gap: 8px;
-    padding: 6px 2px;
+    gap: 6px;
+    padding: 8px 4px;
+    border-radius: 8px;
   }
 
   label {
     gap: 6px;
+    font-size: 0.9rem;
   }
 
   input {
-    padding: 10px 12px;
-  }
-
-  .cta {
-    padding: 10px 16px;
-    font-size: 0.95rem;
-  }
-
-  .title-center {
+    padding: 9px 11px;
     font-size: 1rem;
   }
 
+  .cta {
+    padding: 9px 14px;
+    font-size: 0.9rem;
+  }
+
+  .title-center {
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+  }
+
   .message {
-    padding: 12px 14px;
+    padding: 10px 12px;
+    margin: 0;
+  }
+
+  .composer {
+    gap: 8px;
+    padding: 8px;
   }
 
   .composer-input {
-    gap: 8px;
+    gap: 6px;
   }
 
   .composer-actions {
-    gap: 8px;
+    gap: 6px;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .messages {
-    gap: 10px;
-    padding-right: 4px;
+    gap: 8px;
+    padding-right: 2px;
+  }
+
+  .meta {
+    gap: 4px;
+    font-size: 0.8rem;
+  }
+
+  .avatar-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .message-image {
+    margin-top: 8px;
+    max-height: 280px;
+  }
+
+  .image-preview {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .ghost {
+    padding: 6px 10px;
+    font-size: 0.9rem;
   }
 }

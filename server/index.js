@@ -6,6 +6,8 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const cookie = require("cookie");
 const bcrypt = require("bcryptjs");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const multer = require("multer");
 const { MongoClient } = require("mongodb");
@@ -49,29 +51,93 @@ const upload = multer({
   limits: { fileSize: MAX_IMAGE_BYTES }
 });
 
+// Rate limiters
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts
+  message: "Too many login attempts, please try again later.",
+  standardHeaders: false,
+  legacyHeaders: false
+});
+
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 attempts per hour
+  message: "Too many signup attempts, please try again later.",
+  standardHeaders: false,
+  legacyHeaders: false
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute
+  message: "Too many requests, please try again later.",
+  standardHeaders: false,
+  legacyHeaders: false
+});
+
 let usersCollection;
 let sessionsCollection;
 let messagesCollection;
 
 const GLOBAL_ROOM_ID = "global";
 
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", CLIENT_ORIGIN, "wss:", "https:"],
+      fontSrc: ["'self'", "data:"]
+    }
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: { action: "deny" },
+  xssFilter: true,
+  noSniff: true,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
+}));
+
 app.use(cors({
   origin: CLIENT_ORIGIN,
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
+app.use(apiLimiter);
 
 function normalizeUsername(value) {
-  return String(value || "").trim();
+  const normalized = String(value || "").trim();
+  // Prevent injection attacks and enforce reasonable username format
+  if (!/^[a-zA-Z0-9_-]{3,32}$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
 }
 
 function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
+  const normalized = String(value || "").trim().toLowerCase();
+  // Basic email format validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
 }
 
 function isValidEmail(value) {
-  return /.+@.+\..+/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function validatePassword(password) {
+  // Minimum 8 characters, at least one uppercase, lowercase, number
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
 }
 
 function ensureR2Config() {
@@ -168,7 +234,7 @@ async function requireUser(req, res) {
   }
 }
 
-app.post("/api/signup", async (req, res) => {
+app.post("/api/signup", signupLimiter, async (req, res) => {
   const username = normalizeUsername(req.body.username);
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || "");
@@ -179,6 +245,10 @@ app.post("/api/signup", async (req, res) => {
 
   if (!isValidEmail(email)) {
     return res.status(400).json({ error: "Enter a valid email." });
+  }
+
+  if (!validatePassword(password)) {
+    return res.status(400).json({ error: "Password must be at least 8 characters with uppercase, lowercase, and numbers." });
   }
 
   const existing = await usersCollection.findOne({
@@ -216,8 +286,8 @@ app.post("/api/signup", async (req, res) => {
   return res.json({ username, avatarUrl: null, theme: DEFAULT_THEME });
 });
 
-app.post("/api/login", async (req, res) => {
-  const identifier = normalizeUsername(req.body.identifier);
+app.post("/api/login", loginLimiter, async (req, res) => {
+  let identifier = String(req.body.identifier || "").trim();
   const password = String(req.body.password || "");
 
   if (!identifier || !password) {
@@ -226,7 +296,11 @@ app.post("/api/login", async (req, res) => {
 
   const lookup = identifier.includes("@")
     ? { email: normalizeEmail(identifier) }
-    : { username: identifier };
+    : { username: normalizeUsername(identifier) };
+  
+  if (!lookup.email && !lookup.username) {
+    return res.status(400).json({ error: "Invalid username or email format." });
+  }
 
   const existing = await usersCollection.findOne(lookup);
   if (!existing) {
@@ -289,7 +363,8 @@ app.patch("/api/preferences", async (req, res) => {
   }
 
   const theme = String(req.body.theme || "").trim();
-  if (!theme || !THEMES.has(theme)) {
+  // Strict validation: theme must be in allowed set
+  if (!theme || theme.length > 20 || !THEMES.has(theme)) {
     return res.status(400).json({ error: "Invalid theme." });
   }
 
@@ -305,6 +380,11 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
 
   if (!req.file) {
     return res.status(400).json({ error: "File required." });
+  }
+
+  // Validate file size
+  if (req.file.size > MAX_IMAGE_BYTES) {
+    return res.status(400).json({ error: "File too large." });
   }
 
   try {
@@ -326,6 +406,11 @@ app.post("/api/avatar", upload.single("file"), async (req, res) => {
 
   if (!req.file) {
     return res.status(400).json({ error: "File required." });
+  }
+
+  // Validate file size
+  if (req.file.size > MAX_IMAGE_BYTES) {
+    return res.status(400).json({ error: "File too large." });
   }
 
   try {
@@ -391,7 +476,7 @@ io.on("connection", (socket) => {
     });
 
   socket.on("message", async (payload) => {
-    if (!payload) {
+    if (!payload || typeof payload !== "object") {
       return;
     }
 
@@ -399,6 +484,12 @@ io.on("connection", (socket) => {
     const trimmed = text.trim().slice(0, 500);
     const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : null;
     const imageType = typeof payload.imageType === "string" ? payload.imageType : null;
+
+    // Validate imageUrl is from trusted source if present
+    if (imageUrl && !imageUrl.startsWith(R2_PUBLIC_URL) && !imageUrl.startsWith("https://")) {
+      socket.emit("error", "Invalid image source.");
+      return;
+    }
 
     if (!trimmed && !imageUrl) {
       return;

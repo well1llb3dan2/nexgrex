@@ -134,6 +134,44 @@ export default function App() {
   }, [status]);
 
   useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (e) => {
+      // Check if click is on avatar button or inside menu
+      const avatarButton = document.querySelector(".avatar-button");
+      const menu = document.querySelector(".menu");
+      
+      if (!(avatarButton?.contains(e.target) || menu?.contains(e.target))) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleScroll = () => {
+      setMenuOpen(false);
+    };
+
+    const handleTouchMove = () => {
+      setMenuOpen(false);
+    };
+
+    // Small delay to prevent immediate closing on the click that opened it
+    const timer = setTimeout(() => {
+      document.addEventListener("click", handleClickOutside);
+      document.addEventListener("scroll", handleScroll, true);
+      document.addEventListener("touchmove", handleTouchMove);
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("scroll", handleScroll, true);
+      document.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
     if (!messagesEndRef.current) {
       return;
     }

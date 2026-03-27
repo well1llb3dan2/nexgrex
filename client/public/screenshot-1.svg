@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 720">
+  <!-- Background -->
+  <rect width="540" height="720" fill="#0f172a"/>
+  <!-- Header -->
+  <rect width="540" height="60" fill="#1e293b"/>
+  <circle cx="510" cy="30" r="20" fill="#06b6d4"/>
+  <!-- Messages area -->
+  <g opacity="0.6">
+    <rect x="20" y="80" width="300" height="40" rx="8" fill="#264e45" opacity="0.3"/>
+    <rect x="20" y="130" width="250" height="40" rx="8" fill="#06b6d4" opacity="0.2"/>
+    <rect x="20" y="180" width="280" height="40" rx="8" fill="#264e45" opacity="0.3"/>
+    <rect x="20" y="280" width="240" height="40" rx="8" fill="#06b6d4" opacity="0.2"/>
+  </g>
+  <!-- Input area -->
+  <rect y="660" width="540" height="60" fill="#1e293b"/>
+  <rect x="20" y="670" width="420" height="40" rx="8" fill="#0f172a" stroke="#06b6d4" stroke-width="2"/>
+  <rect x="460" y="670" width="40" height="40" rx="8" fill="#06b6d4"/>
+</svg>

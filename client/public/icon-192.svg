@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" fill="#06b6d4" rx="45"/>
+  <!-- Chat bubble -->
+  <circle cx="96" cy="70" r="35" fill="#0f172a"/>
+  <path d="M 70 130 L 75 105 Q 75 100 80 100 L 112 100 Q 117 100 117 105 L 117 120 Q 117 125 112 125 L 85 125 L 70 130 Z" fill="#0f172a"/>
+  <!-- Accent circle -->
+  <circle cx="140" cy="50" r="20" fill="#f1f5f9" opacity="0.3"/>
+</svg>

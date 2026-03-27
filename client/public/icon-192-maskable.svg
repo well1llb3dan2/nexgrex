@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Maskable background (safe zone from 0 to 192) -->
+  <!-- Chat bubble centered -->
+  <circle cx="96" cy="70" r="35" fill="#06b6d4"/>
+  <path d="M 70 130 L 75 105 Q 75 100 80 100 L 112 100 Q 117 100 117 105 L 117 120 Q 117 125 112 125 L 85 125 L 70 130 Z" fill="#06b6d4"/>
+</svg>

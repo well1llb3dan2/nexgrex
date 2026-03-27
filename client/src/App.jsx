@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import QRCode from "qrcode.react";
+import QRCodeStyling from "qr-code-styling";
 
 const socketOptions = {
   autoConnect: false,
@@ -43,6 +43,7 @@ export default function App() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const qrRef = useRef(null);
   const themes = [
     { id: "atlas", label: "Atlas Drift" },
     { id: "velvet", label: "Velvet Circuit" },
@@ -136,6 +137,38 @@ export default function App() {
     }
     messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!inviteToken || !qrRef.current) {
+      return;
+    }
+
+    const qrCode = new QRCodeStyling({
+      width: 220,
+      height: 220,
+      type: "canvas",
+      data: `${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`,
+      image: "",
+      dotsOptions: {
+        color: themeColors[theme]?.primary || "#000000",
+        type: "rounded"
+      },
+      backgroundOptions: {
+        color: themeColors[theme]?.bg || "#ffffff"
+      },
+      cornersSquareOptions: {
+        type: "extra-rounded"
+      },
+      cornersDotOptions: {
+        type: "dot"
+      },
+      margin: 10
+    });
+
+    // Clear previous QR code
+    qrRef.current.innerHTML = "";
+    qrCode.append(qrRef.current);
+  }, [inviteToken, theme]);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -560,14 +593,7 @@ export default function App() {
                   <div className="invite-qr">
                     <p className="invite-qr-label">Join via QR Code</p>
                     <div className="qr-container">
-                      <QRCode 
-                        value={`${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`}
-                        size={220}
-                        level="H"
-                        includeMargin={true}
-                        bgColor={themeColors[theme]?.bg || "#ffffff"}
-                        fgColor={themeColors[theme]?.primary || "#000000"}
-                      />
+                      <div ref={qrRef} className="qr-code"></div>
                       <div className="qr-overlay">
                         <span className="qr-arrow">↓ Scan Me ↓</span>
                       </div>

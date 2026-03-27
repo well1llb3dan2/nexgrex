@@ -15,7 +15,8 @@ const themeColors = {
   "vintage-groove": { primary: "#d2691e", bg: "#f5d5a8" },
   "ocean-zen": { primary: "#0284c7", bg: "#e0f2fe" },
   "sunset-blaze": { primary: "#f97316", bg: "#fef3c7" },
-  "royal-arcade": { primary: "#a855f7", bg: "#faf5ff" }
+  "royal-arcade": { primary: "#a855f7", bg: "#faf5ff" },
+  "midnight": { primary: "#06b6d4", bg: "#0f172a" }
 };
 
 export default function App() {
@@ -51,7 +52,8 @@ export default function App() {
     { id: "vintage-groove", label: "🎨 Vintage Groove" },
     { id: "ocean-zen", label: "🌊 Ocean Zen" },
     { id: "sunset-blaze", label: "🔥 Sunset Blaze" },
-    { id: "royal-arcade", label: "🎮 Royal Arcade" }
+    { id: "royal-arcade", label: "🎮 Royal Arcade" },
+    { id: "midnight", label: "🌙 Midnight" }
   ];
   const themeIds = new Set(themes.map((item) => item.id));
   const normalizeTheme = (value) => (themeIds.has(value) ? value : "neon-dreams");

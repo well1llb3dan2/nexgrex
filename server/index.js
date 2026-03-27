@@ -31,7 +31,7 @@ const R2_BUCKET = process.env.R2_BUCKET;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const DEFAULT_THEME = "neon-dreams";
-const THEMES = new Set(["neon-dreams", "vintage-groove", "ocean-zen", "sunset-blaze", "royal-arcade"]);
+const THEMES = new Set(["neon-dreams", "vintage-groove", "ocean-zen", "sunset-blaze", "royal-arcade", "midnight"]);
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",

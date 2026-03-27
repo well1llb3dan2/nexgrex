@@ -400,6 +400,32 @@ export default function App() {
     }
   };
 
+  const handleDownloadImage = async (imageUrl) => {
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error("Failed to download image");
+      }
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element and trigger download
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = `nexgrex-image-${Date.now()}.jpg`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      
+      // Clean up the blob URL
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      setError("Failed to download image");
+    }
+  };
+
   const TitleBar = ({
     title,
     onBack,
@@ -764,13 +790,13 @@ export default function App() {
                 </button>
                 <img src={selectedImageUrl} alt="Full view" className="lightbox-image" />
                 <div className="lightbox-actions">
-                  <a
-                    href={selectedImageUrl}
-                    download
+                  <button
+                    type="button"
                     className="ghost"
+                    onClick={() => handleDownloadImage(selectedImageUrl)}
                   >
                     📥 Download
-                  </a>
+                  </button>
                   <button
                     type="button"
                     className="ghost"

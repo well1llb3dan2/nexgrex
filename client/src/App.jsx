@@ -31,7 +31,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [theme, setTheme] = useState("neon-dreams");
+  const [theme, setTheme] = useState("midnight");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function App() {
     { id: "midnight", label: "🌙 Midnight" }
   ];
   const themeIds = new Set(themes.map((item) => item.id));
-  const normalizeTheme = (value) => (themeIds.has(value) ? value : "neon-dreams");
+  const normalizeTheme = (value) => (themeIds.has(value) ? value : "midnight");
 
   useEffect(() => {
     // Check for invite token in URL
@@ -77,7 +77,7 @@ export default function App() {
       .then((data) => {
         setActiveUser(data.username);
         setAvatarUrl(data.avatarUrl || "");
-        setTheme(normalizeTheme(data.theme || "neon-dreams"));
+        setTheme(normalizeTheme(data.theme || "midnight"));
         setStatus("logged-in");
         setView("chat");
       })

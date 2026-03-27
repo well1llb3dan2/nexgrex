@@ -20,6 +20,10 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB || "nexgrex";
 const SESSION_HOURS = 12;
+const INVITE_HOURS = 24;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const R2_ENDPOINT = process.env.R2_ENDPOINT;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
@@ -79,6 +83,7 @@ const apiLimiter = rateLimit({
 let usersCollection;
 let sessionsCollection;
 let messagesCollection;
+let invitesCollection;
 
 const GLOBAL_ROOM_ID = "global";
 
@@ -238,9 +243,14 @@ app.post("/api/signup", signupLimiter, async (req, res) => {
   const username = normalizeUsername(req.body.username);
   const email = normalizeEmail(req.body.email);
   const password = String(req.body.password || "");
+  const inviteToken = String(req.body.inviteToken || "").trim();
 
   if (!username || !email || !password) {
     return res.status(400).json({ error: "Username, email, and password required." });
+  }
+
+  if (!inviteToken) {
+    return res.status(400).json({ error: "Valid invite token required." });
   }
 
   if (!isValidEmail(email)) {
@@ -249,6 +259,18 @@ app.post("/api/signup", signupLimiter, async (req, res) => {
 
   if (!validatePassword(password)) {
     return res.status(400).json({ error: "Password must be at least 8 characters with uppercase, lowercase, and numbers." });
+  }
+
+  // Validate invite token
+  const invite = await invitesCollection.findOne({ token: inviteToken });
+  if (!invite) {
+    return res.status(400).json({ error: "Invalid or expired invite." });
+  }
+  if (invite.expiresAt < new Date()) {
+    return res.status(400).json({ error: "Invite has expired." });
+  }
+  if (invite.used) {
+    return res.status(400).json({ error: "Invite has already been used." });
   }
 
   const existing = await usersCollection.findOne({
@@ -268,6 +290,12 @@ app.post("/api/signup", signupLimiter, async (req, res) => {
       theme: DEFAULT_THEME,
       createdAt: new Date()
     });
+    
+    // Mark invite as used
+    await invitesCollection.updateOne(
+      { token: inviteToken },
+      { $set: { used: true, usedBy: username, usedAt: new Date() } }
+    );
   } catch (error) {
     if (error && error.code === 11000) {
       return res.status(409).json({ error: "Username or email already exists." });
@@ -370,6 +398,30 @@ app.patch("/api/preferences", async (req, res) => {
 
   await usersCollection.updateOne({ username }, { $set: { theme } });
   return res.json({ theme });
+});
+
+app.post("/api/invite", async (req, res) => {
+  const username = await requireUser(req, res);
+  if (!username) {
+    return;
+  }
+
+  try {
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + INVITE_HOURS * 60 * 60 * 1000);
+    
+    await invitesCollection.insertOne({
+      token,
+      createdBy: username,
+      createdAt: new Date(),
+      expiresAt,
+      used: false
+    });
+
+    return res.json({ token, expiresAt });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to generate invite." });
+  }
 });
 
 app.post("/api/upload", upload.single("file"), async (req, res) => {
@@ -525,11 +577,36 @@ async function start() {
   usersCollection = db.collection("users");
   sessionsCollection = db.collection("sessions");
   messagesCollection = db.collection("messages");
+  invitesCollection = db.collection("invites");
 
   await usersCollection.createIndex({ username: 1 }, { unique: true });
   await usersCollection.createIndex({ email: 1 }, { unique: true });
   await sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await messagesCollection.createIndex({ ts: -1 });
+  await invitesCollection.createIndex({ token: 1 }, { unique: true });
+  await invitesCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+  // Seed admin user if configured and not present
+  if (ADMIN_USERNAME && ADMIN_EMAIL && ADMIN_PASSWORD) {
+    const adminExists = await usersCollection.findOne({ username: ADMIN_USERNAME });
+    if (!adminExists) {
+      try {
+        const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+        await usersCollection.insertOne({
+          username: ADMIN_USERNAME,
+          email: ADMIN_EMAIL,
+          passwordHash: adminHash,
+          avatarUrl: null,
+          theme: DEFAULT_THEME,
+          isAdmin: true,
+          createdAt: new Date()
+        });
+        console.log(`Admin user '${ADMIN_USERNAME}' seeded successfully.`);
+      } catch (error) {
+        console.error("Failed to seed admin user:", error.message);
+      }
+    }
+  }
 
   server.listen(PORT, () => {
     console.log(`NEXGREX server listening on ${PORT}`);

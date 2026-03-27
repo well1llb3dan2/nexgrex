@@ -30,8 +30,8 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET = process.env.R2_BUCKET;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-const DEFAULT_THEME = "atlas";
-const THEMES = new Set(["atlas", "velvet", "signal", "canyon", "glacier"]);
+const DEFAULT_THEME = "neon-dreams";
+const THEMES = new Set(["neon-dreams", "vintage-groove", "ocean-zen", "sunset-blaze", "royal-arcade"]);
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",

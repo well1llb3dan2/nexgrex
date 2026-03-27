@@ -1217,8 +1217,23 @@
     position: relative;
     display: inline-block;
     border-radius: 16px;
-    overflow: visible;
+    overflow: hidden;
     animation: qrPulse 3s ease-in-out infinite;
+    /* Bus shape clip-path */
+    clip-path: polygon(
+      15% 0%,      /* top left of windshield */
+      85% 0%,      /* top right of windshield */
+      95% 20%,     /* right side upper */
+      100% 40%,    /* right side */
+      100% 85%,    /* right side lower before wheel area */
+      90% 95%,     /* right wheel area indent */
+      85% 100%,    /* right wheel bottom */
+      15% 100%,    /* left wheel bottom */
+      10% 95%,     /* left wheel area indent */
+      0% 85%,      /* left side lower before wheel area */
+      0% 40%,      /* left side */
+      5% 20%       /* left side upper */
+    );
 
     &:hover {
       animation: qrPulseHover 0.6s ease-out;

@@ -9,6 +9,15 @@ const socketOptions = {
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const GLOBAL_ROOM_ID = "global";
 
+// Theme color mapping for QR codes
+const themeColors = {
+  atlas: { primary: "#2b5d8a", bg: "#eef1f6" },
+  velvet: { primary: "#8b2f2f", bg: "#f6eee8" },
+  signal: { primary: "#5b0a82", bg: "#f3e8fc" },
+  canyon: { primary: "#b8592d", bg: "#f9e4d4" },
+  glacier: { primary: "#0d5c6e", bg: "#e8f4f8" }
+};
+
 export default function App() {
   const [status, setStatus] = useState("checking");
   const [view, setView] = useState("chat");
@@ -549,15 +558,20 @@ export default function App() {
                     </button>
                   </div>
                   <div className="invite-qr">
-                    <p className="invite-qr-label">Or scan QR code:</p>
-                    <QRCode 
-                      value={`${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`}
-                      size={200}
-                      level="H"
-                      includeMargin={true}
-                      bgColor="#ffffff"
-                      fgColor="#000000"
-                    />
+                    <p className="invite-qr-label">Join via QR Code</p>
+                    <div className="qr-container">
+                      <QRCode 
+                        value={`${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`}
+                        size={220}
+                        level="H"
+                        includeMargin={true}
+                        bgColor={themeColors[theme]?.bg || "#ffffff"}
+                        fgColor={themeColors[theme]?.primary || "#000000"}
+                      />
+                      <div className="qr-overlay">
+                        <span className="qr-arrow">↓ Scan Me ↓</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

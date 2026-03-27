@@ -702,9 +702,67 @@ input::placeholder {
   text-align: center;
 }
 
-.invite-qr canvas {
-  border-radius: 8px;
-  border: 2px solid var(--border-color);
+.qr-container {
+  position: relative;
+  display: inline-block;
+  border-radius: 16px;
+  overflow: visible;
+  animation: qrPulse 3s ease-in-out infinite;
+}
+
+.qr-container:hover {
+  animation: qrPulseHover 0.6s ease-out;
+}
+
+@keyframes qrPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1), inset 0 0 10px rgba(0, 0, 0, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--primary), inset 0 0 15px rgba(0, 0, 0, 0.08);
+  }
+}
+
+@keyframes qrPulseHover {
+  0% {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--primary), 0 0 50px rgba(0, 0, 0, 0.15);
+    transform: scale(1.03);
+  }
+  100% {
+    box-shadow: 0 0 20px var(--primary);
+    transform: scale(1.02);
+  }
+}
+
+.qr-container canvas {
+  border-radius: 16px;
+  display: block;
+  background: white;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.qr-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.qr-arrow {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: arrowBounce 2s ease-in-out infinite;
+  opacity: 0.85;
 }
 
 .section-title {
@@ -822,6 +880,21 @@ input::placeholder {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes arrowBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-4px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-2px);
   }
 }
 
@@ -1060,8 +1133,20 @@ input::placeholder {
     gap: 8px;
   }
 
-  .invite-qr canvas {
-    max-width: 100%;
-    height: auto;
+  .invite-qr-label {
+    font-size: 0.85rem;
+  }
+
+  .qr-container {
+    border-radius: 12px;
+  }
+
+  .qr-container canvas {
+    border-radius: 12px;
+    padding: 6px;
+  }
+
+  .qr-arrow {
+    font-size: 1.2rem;
   }
 }

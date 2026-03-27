@@ -248,6 +248,9 @@ body {
   color: var(--ink);
   background: var(--bg-layer-1), var(--bg-layer-2), var(--bg-layer-3);
   overflow-x: hidden;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body::before,
@@ -300,19 +303,28 @@ body::after {
 
 .hero {
   display: grid;
-  gap: 12px;
+  gap: 16px;
+  text-align: center;
 }
 
 .hero h1 {
   margin: 0;
   font-size: clamp(2.2rem, 4vw, 3.4rem);
   font-family: var(--font-display);
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -1px;
 }
 
 .hero p {
   margin: 0;
   color: var(--muted);
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .badge {
@@ -335,11 +347,23 @@ body::after {
   box-shadow: var(--shadow);
   backdrop-filter: blur(6px);
   border: var(--border-width) solid var(--border-color);
+  animation: slideIn 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .login form {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .auth-toggle {
@@ -349,37 +373,62 @@ body::after {
   padding: 6px;
   border-radius: var(--radius-pill);
   width: fit-content;
+  border: 1px solid var(--border-color);
 }
 
 .toggle {
   border: none;
   background: transparent;
   color: var(--secondary);
-  padding: 8px 18px;
+  padding: 9px 20px;
   border-radius: var(--radius-pill);
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.toggle:hover {
+  color: var(--primary);
 }
 
 .toggle.active {
-  background: var(--secondary);
+  background: linear-gradient(135deg, var(--secondary), var(--primary));
   color: #fff;
-  box-shadow: 0 10px 18px rgba(10, 107, 107, 0.3);
+  box-shadow: 0 8px 16px rgba(10, 107, 107, 0.3);
 }
 
 label {
   display: grid;
   gap: 8px;
-  font-weight: 600;
+  font-weight: 650;
+  color: var(--ink);
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
 }
 
 input {
   padding: 12px 14px;
   border-radius: var(--radius-soft);
-  border: var(--border-width) solid var(--border-strong);
+  border: 2px solid var(--border-strong);
   font-size: 1rem;
   background: var(--input-bg);
   color: var(--ink);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(10, 107, 107, 0.1);
+  transform: translateY(-1px);
+}
+
+input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 .cta {
@@ -391,26 +440,64 @@ input {
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
   box-shadow: var(--button-shadow);
+  position: relative;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.cta::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: left 0.3s ease;
 }
 
 .cta:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 28px rgba(200, 87, 46, 0.35);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 32px rgba(200, 87, 46, 0.4);
+}
+
+.cta:hover::before {
+  left: 100%;
+}
+
+.cta:active {
+  transform: translateY(-1px);
 }
 
 .cta.small {
   padding: 10px 16px;
+  font-size: 0.95rem;
 }
 
 .ghost {
   background: var(--ghost-bg);
-  border: var(--border-width) solid var(--ghost-border);
+  border: 2px solid var(--ghost-border);
   padding: 8px 14px;
   border-radius: var(--radius-button);
   cursor: pointer;
   color: var(--ink);
+  transition: all 0.2s ease;
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.ghost:hover {
+  background: var(--surface-muted);
+  border-color: var(--secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ghost:active {
+  transform: translateY(0);
 }
 
 .ghost.back {
@@ -444,14 +531,22 @@ input {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 12px;
-  padding: 8px 4px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
 }
 
 .title-center {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
   text-align: center;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .title-right,
@@ -467,11 +562,11 @@ input {
 }
 
 .avatar-button {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-pill);
-  border: none;
-  background: var(--surface-muted);
+  border: 2px solid var(--secondary);
+  background: linear-gradient(135deg, var(--surface-muted), var(--surface));
   color: var(--secondary);
   font-weight: 700;
   cursor: pointer;
@@ -479,6 +574,13 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(10, 107, 107, 0.2);
+}
+
+.avatar-button:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 8px 20px rgba(10, 107, 107, 0.3);
 }
 
 .avatar-button img {
@@ -494,17 +596,29 @@ input {
 
 .menu {
   position: absolute;
-  top: 54px;
+  top: 60px;
   right: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   background: var(--surface-strong);
   padding: 12px;
   border-radius: var(--radius-soft);
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   border: var(--border-width) solid var(--border-color);
-  min-width: 140px;
+  min-width: 150px;
   z-index: 5;
+  animation: slideDown 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .menu button {
@@ -514,6 +628,15 @@ input {
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.menu button:hover {
+  background: var(--surface-muted);
+  transform: translateX(2px);
 }
 
 .section-title {
@@ -556,19 +679,35 @@ input {
 }
 
 .theme-card {
-  border: var(--border-width) solid var(--border-color);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-soft);
-  padding: 14px;
+  padding: 16px;
   background: var(--surface);
   text-align: left;
   display: grid;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  font-weight: 600;
+}
+
+.theme-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(10, 107, 107, 0.15);
+  border-color: var(--secondary);
 }
 
 .theme-card.active {
   border-color: var(--secondary);
-  box-shadow: 0 12px 20px rgba(10, 107, 107, 0.2);
+  background: linear-gradient(135deg, var(--surface-muted), var(--surface));
+  box-shadow: 0 12px 28px rgba(10, 107, 107, 0.25), inset 0 0 0 1px rgba(10, 107, 107, 0.1);
+  transform: scale(1.03);
+}
+
+.theme-card small {
+  opacity: 0.7;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .online {
@@ -595,19 +734,41 @@ input {
   border-radius: var(--radius-soft);
   padding: 14px 16px;
   border: var(--border-width) solid var(--border-color);
+  animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s ease;
+}
+
+.message:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .meta {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
   color: var(--muted);
-  font-size: 0.9rem;
-  margin-bottom: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .message p {
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .message-image {
@@ -623,6 +784,11 @@ input {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(8px);
 }
 
 .composer-input {
@@ -640,6 +806,7 @@ input {
   position: relative;
   overflow: hidden;
   text-align: center;
+  transition: all 0.2s ease;
 }
 
 .attach input {
@@ -651,10 +818,12 @@ input {
 
 .image-preview {
   background: var(--surface-muted);
-  padding: 10px;
+  padding: 12px;
   border-radius: var(--radius-soft);
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  animation: slideIn 0.3s ease;
 }
 
 .image-preview img {
@@ -662,6 +831,7 @@ input {
   max-height: 200px;
   object-fit: cover;
   border-radius: calc(var(--radius-soft) - 4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .image-preview button {
@@ -672,6 +842,12 @@ input {
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.image-preview button:hover {
+  color: var(--primary);
 }
 
 .status {

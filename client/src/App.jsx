@@ -28,6 +28,8 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const themes = [
@@ -258,6 +260,30 @@ export default function App() {
     setTheme(data.theme || nextTheme);
   };
 
+  const handleGenerateInvite = async () => {
+    setInviteLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        credentials: "include"
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to generate invite.");
+      }
+
+      const data = await res.json();
+      setInviteToken(data.token);
+    } catch (err) {
+      setError(err.message || "Failed to generate invite.");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
   const TitleBar = ({
     title,
     onBack,
@@ -299,6 +325,13 @@ export default function App() {
               }}
             >
               Options
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateInvite}
+              disabled={inviteLoading}
+            >
+              {inviteLoading ? "Generating..." : "Generate Invite"}
             </button>
             <button type="button" onClick={handleLogout}>
               Log-out
@@ -470,6 +503,25 @@ export default function App() {
                 showMenu={menuOpen}
                 onAvatarClick={() => setMenuOpen((prev) => !prev)}
               />
+              {inviteToken && (
+                <div className="invite-display">
+                  <p className="invite-label">Share this invite link:</p>
+                  <div className="invite-token-container">
+                    <code className="invite-token">{inviteToken}</code>
+                    <button
+                      type="button"
+                      className="ghost small"
+                      onClick={() => {
+                        navigator.clipboard.writeText(inviteToken);
+                        setInviteToken("");
+                      }}
+                    >
+                      Copy & Close
+                    </button>
+                  </div>
+                </div>
+              )}
+              {error && <p className="error" style={{ margin: "12px 0" }}>{error}</p>}
               <div className="chat">
                 <div className="messages">
                   {messages.length === 0 && (

@@ -87,6 +87,26 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Disable right-click context menu
+    const handleContextMenu = (e) => e.preventDefault();
+    
+    // Disable long-press on mobile
+    const handleTouchStart = (e) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("contextmenu", handleContextMenu, false);
+    document.addEventListener("touchstart", handleTouchStart, false);
+
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu, false);
+      document.removeEventListener("touchstart", handleTouchStart, false);
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 

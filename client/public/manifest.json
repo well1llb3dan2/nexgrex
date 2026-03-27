@@ -156,7 +156,8 @@
   },
   "scope_extensions": [
     {
-      "origin": "https://localhost:3001"
+      "origin": "https://localhost:3001",
+      "type": "app-api"
     }
   ],
   "permissions": [

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import QRCode from "qrcode.react";
 
 const socketOptions = {
   autoConnect: false,
@@ -16,6 +17,7 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [signupInviteToken, setSignupInviteToken] = useState("");
   const [activeUser, setActiveUser] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -43,6 +45,14 @@ export default function App() {
   const normalizeTheme = (value) => (themeIds.has(value) ? value : "atlas");
 
   useEffect(() => {
+    // Check for invite token in URL
+    const params = new URLSearchParams(window.location.search);
+    const tokenParam = params.get("token");
+    if (tokenParam) {
+      setSignupInviteToken(tokenParam);
+      setMode("signup");
+    }
+
     fetch("/api/me", { credentials: "include" })
       .then(async (res) => {
         if (!res.ok) {
@@ -153,7 +163,7 @@ export default function App() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ username, email, password })
+      body: JSON.stringify({ username, email, password, inviteToken: signupInviteToken })
     });
 
     if (!res.ok) {
@@ -171,6 +181,7 @@ export default function App() {
     setUsername("");
     setEmail("");
     setPassword("");
+    setSignupInviteToken("");
   };
 
   const handleLogout = async () => {
@@ -328,12 +339,21 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={handleGenerateInvite}
+              onClick={() => {
+                handleGenerateInvite();
+                setMenuOpen(false);
+              }}
               disabled={inviteLoading}
             >
               {inviteLoading ? "Generating..." : "Generate Invite"}
             </button>
-            <button type="button" onClick={handleLogout}>
+            <button
+              type="button"
+              onClick={async () => {
+                await handleLogout();
+                setMenuOpen(false);
+              }}
+            >
               Log-out
             </button>
           </div>
@@ -480,6 +500,15 @@ export default function App() {
                   autoComplete="new-password"
                 />
               </label>
+              <label>
+                Invite Code
+                <input
+                  value={signupInviteToken}
+                  onChange={(event) => setSignupInviteToken(event.target.value)}
+                  placeholder="Enter your invite token"
+                  autoComplete="off"
+                />
+              </label>
               {error && <p className="error">{error}</p>}
               <button type="submit" className="cta">
                 Create account
@@ -518,6 +547,17 @@ export default function App() {
                     >
                       Copy & Close
                     </button>
+                  </div>
+                  <div className="invite-qr">
+                    <p className="invite-qr-label">Or scan QR code:</p>
+                    <QRCode 
+                      value={`${window.location.origin}/?token=${encodeURIComponent(inviteToken)}`}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                      bgColor="#ffffff"
+                      fgColor="#000000"
+                    />
                   </div>
                 </div>
               )}

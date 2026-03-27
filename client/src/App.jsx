@@ -6,10 +6,11 @@ const socketOptions = {
   withCredentials: true
 };
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const GLOBAL_ROOM_ID = "global";
 
 export default function App() {
   const [status, setStatus] = useState("checking");
-  const [view, setView] = useState("rooms");
+  const [view, setView] = useState("chat");
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -20,10 +21,6 @@ export default function App() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [theme, setTheme] = useState("atlas");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [rooms, setRooms] = useState([]);
-  const [roomName, setRoomName] = useState("");
-  const [activeRoom, setActiveRoom] = useState(null);
-  const [roomsStatus, setRoomsStatus] = useState("idle");
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -32,10 +29,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
-  const activeRoomRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const activeRoomData = rooms.find((room) => room.id === activeRoom);
-  const now = Date.now();
   const themes = [
     { id: "atlas", label: "Atlas Drift" },
     { id: "velvet", label: "Velvet Circuit" },
@@ -45,27 +39,6 @@ export default function App() {
   ];
   const themeIds = new Set(themes.map((item) => item.id));
   const normalizeTheme = (value) => (themeIds.has(value) ? value : "atlas");
-
-  const getActivityBadge = (room) => {
-    if (!room || !room.lastMessageAt) {
-      return null;
-    }
-    const diff = now - room.lastMessageAt;
-    const tenMinutes = 10 * 60 * 1000;
-    const twelveHours = 12 * 60 * 60 * 1000;
-    const fortyEightHours = 48 * 60 * 60 * 1000;
-
-    if (diff <= tenMinutes) {
-      return { label: "Active 10m", tone: "hot" };
-    }
-    if (diff <= twelveHours) {
-      return { label: "Active 12h", tone: "warm" };
-    }
-    if (diff <= fortyEightHours) {
-      return { label: "Active 48h", tone: "cool" };
-    }
-    return null;
-  };
 
   useEffect(() => {
     fetch("/api/me", { credentials: "include" })
@@ -80,7 +53,7 @@ export default function App() {
         setAvatarUrl(data.avatarUrl || "");
         setTheme(normalizeTheme(data.theme || "atlas"));
         setStatus("logged-in");
-        setView("rooms");
+        setView("chat");
       })
       .catch(() => {
         setStatus("logged-out");
@@ -104,10 +77,6 @@ export default function App() {
   }, [imageFile]);
 
   useEffect(() => {
-    activeRoomRef.current = activeRoom;
-  }, [activeRoom]);
-
-  useEffect(() => {
     if (status !== "logged-in") {
       return;
     }
@@ -117,21 +86,16 @@ export default function App() {
 
     socket.on("connect", () => {
       setConnected(true);
-      if (activeRoomRef.current) {
-        socket.emit("join-room", activeRoomRef.current);
-      }
     });
     socket.on("disconnect", () => setConnected(false));
     socket.on("history", (payload) => {
-      if (!payload || payload.roomId !== activeRoomRef.current) {
+      if (!payload || !Array.isArray(payload.messages)) {
         return;
       }
-      if (Array.isArray(payload.messages)) {
-        setMessages(payload.messages);
-      }
+      setMessages(payload.messages);
     });
     socket.on("message", (message) => {
-      if (message.roomId !== activeRoomRef.current) {
+      if (!message) {
         return;
       }
       setMessages((prev) => [...prev, message]);
@@ -146,41 +110,11 @@ export default function App() {
   }, [status]);
 
   useEffect(() => {
-    if (!activeRoom || !socketRef.current) {
-      return;
-    }
-    activeRoomRef.current = activeRoom;
-    socketRef.current.emit("join-room", activeRoom);
-  }, [activeRoom]);
-
-  useEffect(() => {
     if (!messagesEndRef.current) {
       return;
     }
     messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [messages, activeRoom]);
-
-  useEffect(() => {
-    if (status !== "logged-in") {
-      return;
-    }
-
-    setRoomsStatus("loading");
-    fetch("/api/rooms", { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error("failed");
-        }
-        return res.json();
-      })
-      .then((data) => {
-        setRooms(Array.isArray(data.rooms) ? data.rooms : []);
-        setRoomsStatus("ready");
-      })
-      .catch(() => {
-        setRoomsStatus("error");
-      });
-  }, [status]);
+  }, [messages]);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -204,7 +138,7 @@ export default function App() {
     setAvatarUrl(data.avatarUrl || "");
     setTheme(normalizeTheme(data.theme || "atlas"));
     setStatus("logged-in");
-    setView("rooms");
+    setView("chat");
     setIdentifier("");
     setPassword("");
   };
@@ -231,7 +165,7 @@ export default function App() {
     setAvatarUrl(data.avatarUrl || "");
     setTheme(normalizeTheme(data.theme || "atlas"));
     setStatus("logged-in");
-    setView("rooms");
+    setView("chat");
     setUsername("");
     setEmail("");
     setPassword("");
@@ -243,15 +177,11 @@ export default function App() {
       credentials: "include"
     });
     setMessages([]);
-    setRooms([]);
-    setActiveRoom(null);
-    setRoomName("");
-    setAvatarUrl("");
     setImageFile(null);
     setImagePreview("");
     setActiveUser("");
     setTheme("atlas");
-    setView("rooms");
+    setView("chat");
     setMenuOpen(false);
     setStatus("logged-out");
     setConnected(false);
@@ -307,50 +237,6 @@ export default function App() {
   const clearImage = () => {
     setImageFile(null);
     setImagePreview("");
-  };
-
-  const handleCreateRoom = async (event) => {
-    event.preventDefault();
-    setError("");
-    const name = roomName.trim();
-    if (!name) {
-      setError("Room name required.");
-      return;
-    }
-
-    const res = await fetch("/api/rooms", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ name })
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Could not create room.");
-      return;
-    }
-
-    const data = await res.json();
-    const room = data.room;
-    setRooms((prev) => [...prev, room]);
-    setRoomName("");
-  };
-
-  const handleJoinRoom = (room) => {
-    if (!room || !room.id) {
-      return;
-    }
-    activeRoomRef.current = room.id;
-    if (socketRef.current) {
-      socketRef.current.emit("join-room", room.id);
-    }
-    if (activeRoom !== room.id) {
-      setActiveRoom(room.id);
-    }
-    setMessages([]);
-    setView("chat");
-    setMenuOpen(false);
   };
 
   const handleThemeChange = async (nextTheme) => {
@@ -425,7 +311,7 @@ export default function App() {
 
   const handleSend = (event) => {
     event.preventDefault();
-    if (!socketRef.current || !activeRoom || uploading) {
+    if (!socketRef.current || uploading) {
       return;
     }
 
@@ -436,7 +322,6 @@ export default function App() {
 
     const sendMessage = (imagePayload) => {
       socketRef.current.emit("message", {
-        roomId: activeRoom,
         text: trimmed,
         imageUrl: imagePayload ? imagePayload.url : null,
         imageType: imagePayload ? imagePayload.contentType : null
@@ -577,88 +462,11 @@ export default function App() {
 
       {status === "logged-in" && (
         <section className="card app-shell">
-          {view === "rooms" && (
+          {view === "chat" && (
             <>
               <TitleBar
                 title="NEXGREX"
                 onBack={null}
-                showMenu={menuOpen}
-                onAvatarClick={() => setMenuOpen((prev) => !prev)}
-              />
-              <div className="room-grid">
-                <div className="room-list">
-                  <div className="section-title">Available rooms</div>
-                  {roomsStatus === "loading" && <p>Loading rooms...</p>}
-                  {roomsStatus === "error" && (
-                    <p className="error">Could not load rooms.</p>
-                  )}
-                  {roomsStatus === "ready" && rooms.length === 0 && (
-                    <div className="empty-state">
-                      <h3>No rooms yet</h3>
-                      <p>Create the first room and set the tone.</p>
-                    </div>
-                  )}
-                  {rooms.length > 0 && (
-                    <div className="room-items">
-                      {rooms.map((room) => (
-                        <button
-                          key={room.id}
-                          type="button"
-                          className={
-                            activeRoom === room.id
-                              ? "room-chip active"
-                              : "room-chip"
-                          }
-                          onClick={() => handleJoinRoom(room)}
-                        >
-                          {(() => {
-                            const badge = getActivityBadge(room);
-                            return (
-                              <>
-                                <div className="room-chip-top">
-                                  <span>{room.name}</span>
-                                  {badge && (
-                                    <span className={`badge-pill ${badge.tone}`}>
-                                      {badge.label}
-                                    </span>
-                                  )}
-                                </div>
-                                <small>Created by {room.createdBy}</small>
-                              </>
-                            );
-                          })()}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="room-create">
-                  <div className="section-title">Create a room</div>
-                  <form onSubmit={handleCreateRoom}>
-                    <label>
-                      Room name
-                      <input
-                        value={roomName}
-                        onChange={(event) => setRoomName(event.target.value)}
-                        placeholder="e.g. Morning coffee"
-                      />
-                    </label>
-                    {error && <p className="error">{error}</p>}
-                    <button type="submit" className="cta">
-                      Create room
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </>
-          )}
-
-          {view === "chat" && activeRoom && (
-            <>
-              <TitleBar
-                title={activeRoomData ? activeRoomData.name : "Room chat"}
-                onBack={() => setView("rooms")}
                 showMenu={menuOpen}
                 onAvatarClick={() => setMenuOpen((prev) => !prev)}
               />
@@ -739,7 +547,7 @@ export default function App() {
             <>
               <TitleBar
                 title="Options"
-                onBack={() => setView("rooms")}
+                onBack={() => setView("chat")}
                 showMenu={false}
                 onAvatarClick={null}
                 avatarDisabled

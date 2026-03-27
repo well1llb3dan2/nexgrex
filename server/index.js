@@ -52,7 +52,8 @@ const upload = multer({
 let usersCollection;
 let sessionsCollection;
 let messagesCollection;
-let roomsCollection;
+
+const GLOBAL_ROOM_ID = "global";
 
 app.use(cors({
   origin: CLIENT_ORIGIN,
@@ -307,7 +308,7 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
   }
 
   try {
-    const result = await uploadImageToR2(req.file, "uploads");
+    const result = await uploadImageToR2(req.file, "messages");
     return res.json({ url: result.url, contentType: result.contentType, size: result.size });
   } catch (error) {
     if (error && error.code === "UNSUPPORTED_TYPE") {
@@ -342,49 +343,7 @@ app.post("/api/avatar", upload.single("file"), async (req, res) => {
   }
 });
 
-app.get("/api/rooms", async (req, res) => {
-  const username = await requireUser(req, res);
-  if (!username) {
-    return;
-  }
 
-  const rooms = await roomsCollection
-    .find({})
-    .sort({ createdAt: 1 })
-    .project({ _id: 0 })
-    .toArray();
-  res.json({ rooms });
-});
-
-app.post("/api/rooms", async (req, res) => {
-  const username = await requireUser(req, res);
-  if (!username) {
-    return;
-  }
-
-  const name = String(req.body.name || "").trim();
-  if (!name) {
-    return res.status(400).json({ error: "Room name required." });
-  }
-
-  const room = {
-    id: uuidv4(),
-    name: name.slice(0, 80),
-    createdBy: username,
-    createdAt: Date.now(),
-    lastMessageAt: null
-  };
-
-  try {
-    await roomsCollection.insertOne(room);
-    return res.status(201).json({ room });
-  } catch (error) {
-    if (error && error.code === 11000) {
-      return res.status(409).json({ error: "Room name already exists." });
-    }
-    return res.status(500).json({ error: "Could not create room." });
-  }
-});
 
 if (NODE_ENV === "production") {
   const distPath = path.join(__dirname, "..", "client", "dist");
@@ -416,42 +375,23 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  socket.on("join-room", async (roomId) => {
-    if (!roomId) {
-      return;
-    }
-    const room = await roomsCollection.findOne({ id: roomId });
-    if (!room) {
-      return;
-    }
+  socket.data.activeRoom = GLOBAL_ROOM_ID;
+  socket.join(GLOBAL_ROOM_ID);
 
-    if (socket.data.activeRoom) {
-      socket.leave(socket.data.activeRoom);
-    }
-
-    socket.data.activeRoom = roomId;
-    socket.join(roomId);
-
-    messagesCollection
-      .find({ roomId })
-      .sort({ ts: -1 })
-      .limit(200)
-      .toArray()
-      .then((docs) => {
-        socket.emit("history", { roomId, messages: docs.reverse() });
-      })
-      .catch(() => {
-        socket.emit("history", { roomId, messages: [] });
-      });
-  });
+  messagesCollection
+    .find({})
+    .sort({ ts: -1 })
+    .limit(200)
+    .toArray()
+    .then((docs) => {
+      socket.emit("history", { messages: docs.reverse() });
+    })
+    .catch(() => {
+      socket.emit("history", { messages: [] });
+    });
 
   socket.on("message", async (payload) => {
     if (!payload) {
-      return;
-    }
-
-    const roomId = payload.roomId;
-    if (!roomId) {
       return;
     }
 
@@ -466,7 +406,6 @@ io.on("connection", (socket) => {
 
     const msg = {
       id: uuidv4(),
-      roomId,
       user: socket.data.username,
       text: trimmed,
       imageUrl,
@@ -476,11 +415,7 @@ io.on("connection", (socket) => {
 
     try {
       await messagesCollection.insertOne(msg);
-      await roomsCollection.updateOne(
-        { id: roomId },
-        { $set: { lastMessageAt: msg.ts } }
-      );
-      io.to(roomId).emit("message", msg);
+      io.to(GLOBAL_ROOM_ID).emit("message", msg);
     } catch (error) {
       socket.emit("error", "Message failed to save.");
     }
@@ -499,14 +434,11 @@ async function start() {
   usersCollection = db.collection("users");
   sessionsCollection = db.collection("sessions");
   messagesCollection = db.collection("messages");
-  roomsCollection = db.collection("rooms");
 
   await usersCollection.createIndex({ username: 1 }, { unique: true });
   await usersCollection.createIndex({ email: 1 }, { unique: true });
   await sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await messagesCollection.createIndex({ ts: -1 });
-  await messagesCollection.createIndex({ roomId: 1, ts: -1 });
-  await roomsCollection.createIndex({ name: 1 }, { unique: true });
 
   server.listen(PORT, () => {
     console.log(`NEXGREX server listening on ${PORT}`);

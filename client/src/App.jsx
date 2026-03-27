@@ -32,6 +32,8 @@ export default function App() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [theme, setTheme] = useState("neon-dreams");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -370,45 +372,25 @@ export default function App() {
         </button>
         {showMenu && (
           <div className="menu">
-            {/* Profile Section */}
-            <div className="menu-section">
-              <div className="menu-label">👤 Profile</div>
-              <label className="menu-upload">
-                {avatarUploading ? "Uploading..." : "📸 Update avatar"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleAvatarChange}
-                  disabled={avatarUploading}
-                />
-              </label>
-            </div>
-
-            {/* Themes Section */}
-            <div className="menu-section">
-              <div className="menu-label">🎨 Theme</div>
-              <div className="menu-themes">
-                {themes.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={theme === item.id ? "menu-theme-btn active" : "menu-theme-btn"}
-                    onClick={() => {
-                      handleThemeChange(item.id);
-                      setMenuOpen(false);
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Divider */}
+            <button
+              type="button"
+              onClick={() => {
+                setProfileModalOpen(true);
+                setMenuOpen(false);
+              }}
+            >
+              👤 Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setThemesModalOpen(true);
+                setMenuOpen(false);
+              }}
+            >
+              🎨 Themes
+            </button>
             <div className="menu-divider" />
-
-            {/* Actions */}
             <button
               type="button"
               onClick={() => {
@@ -748,6 +730,79 @@ export default function App() {
                 {error && <p className="error">{error}</p>}
               </div>
             </>
+          )}
+
+          {/* Profile Modal */}
+          {profileModalOpen && (
+            <div className="modal-overlay" onClick={() => setProfileModalOpen(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>👤 Profile</h3>
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={() => setProfileModalOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="modal-section">
+                    <label className="avatar-upload-label">
+                      {avatarUrl && <img src={avatarUrl} alt="Current avatar" className="avatar-preview" />}
+                      <div className="upload-button">
+                        {avatarUploading ? "Uploading..." : "📸 Update avatar"}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleAvatarChange}
+                        disabled={avatarUploading}
+                      />
+                    </label>
+                  </div>
+                  {error && <p className="error">{error}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Themes Modal */}
+          {themesModalOpen && (
+            <div className="modal-overlay" onClick={() => setThemesModalOpen(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>🎨 Select Theme</h3>
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={() => setThemesModalOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="theme-grid">
+                    {themes.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={theme === item.id ? "theme-card active" : "theme-card"}
+                        onClick={() => {
+                          handleThemeChange(item.id);
+                          setThemesModalOpen(false);
+                        }}
+                      >
+                        <span>{item.label}</span>
+                        <small>{item.id}</small>
+                      </button>
+                    ))}
+                  </div>
+                  {error && <p className="error">{error}</p>}
+                </div>
+              </div>
+            </div>
           )}
         </section>
       )}

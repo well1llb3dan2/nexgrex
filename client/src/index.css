@@ -247,6 +247,7 @@ body {
   font-family: var(--font-body);
   color: var(--ink);
   background: var(--bg-layer-1), var(--bg-layer-2), var(--bg-layer-3);
+  overflow-x: hidden;
 }
 
 body::before,
@@ -290,9 +291,7 @@ body::after {
 
 .page {
   padding: 48px 18px 18px;
-  max-width: 1000px;
   width: 100%;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   height: 100%;

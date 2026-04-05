@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import QRCodeStyling from "qr-code-styling";
 
@@ -87,6 +87,83 @@ const resizeAvatarForUpload = async (file) => {
   });
 };
 
+const THEMES = [
+  { id: "neon-dreams", label: "✨ Neon Dreams" },
+  { id: "vintage-groove", label: "🎨 Vintage Groove" },
+  { id: "ocean-zen", label: "🌊 Ocean Zen" },
+  { id: "sunset-blaze", label: "🔥 Sunset Blaze" },
+  { id: "royal-arcade", label: "🎮 Royal Arcade" },
+  { id: "midnight", label: "🌙 Midnight" }
+];
+const THEME_IDS = new Set(THEMES.map((t) => t.id));
+const normalizeTheme = (value) => (THEME_IDS.has(value) ? value : "midnight");
+
+function TitleBar({
+  title,
+  onBack,
+  showMenu,
+  onAvatarClick,
+  avatarDisabled,
+  avatarUrl,
+  activeUser,
+  inviteLoading,
+  onOpenProfile,
+  onOpenThemes,
+  onGenerateInvite,
+  onLogout
+}) {
+  return (
+    <div className="title-bar">
+      <div className="title-left">
+        {onBack ? (
+          <button type="button" className="ghost back" onClick={onBack}>
+            Back
+          </button>
+        ) : (
+          <span />
+        )}
+      </div>
+      <div className="title-center">{title}</div>
+      <div className="title-right">
+        <button
+          type="button"
+          className="avatar-button"
+          onClick={avatarDisabled ? undefined : onAvatarClick}
+          disabled={avatarDisabled || !onAvatarClick}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Avatar" />
+          ) : (
+            <span>{activeUser ? activeUser[0]?.toUpperCase() : "?"}</span>
+          )}
+        </button>
+        {showMenu && (
+          <div className="menu">
+            <button type="button" onClick={onOpenProfile}>
+              👤 Profile
+            </button>
+            <button type="button" onClick={onOpenThemes}>
+              🎨 Themes
+            </button>
+            <div className="menu-divider" />
+            <button
+              type="button"
+              onClick={onGenerateInvite}
+              disabled={inviteLoading}
+              className="menu-action"
+            >
+              {inviteLoading ? "Generating..." : "🔗 Generate Invite"}
+            </button>
+            <button type="button" onClick={onLogout} className="menu-action">
+              ✌️ Log-out
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [status, setStatus] = useState("checking");
   const [view, setView] = useState("chat");
@@ -99,7 +176,14 @@ export default function App() {
   const [activeUser, setActiveUser] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [theme, setTheme] = useState("midnight");
+  const [theme, setTheme] = useState(() => {
+    try {
+      const stored = localStorage.getItem("nexgrex-theme");
+      return stored && THEME_IDS.has(stored) ? stored : "midnight";
+    } catch {
+      return "midnight";
+    }
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
@@ -120,16 +204,6 @@ export default function App() {
   const avatarCameraRef = useRef(null);
   const messagesEndRef = useRef(null);
   const qrRef = useRef(null);
-  const themes = [
-    { id: "neon-dreams", label: "✨ Neon Dreams" },
-    { id: "vintage-groove", label: "🎨 Vintage Groove" },
-    { id: "ocean-zen", label: "🌊 Ocean Zen" },
-    { id: "sunset-blaze", label: "🔥 Sunset Blaze" },
-    { id: "royal-arcade", label: "🎮 Royal Arcade" },
-    { id: "midnight", label: "🌙 Midnight" }
-  ];
-  const themeIds = new Set(themes.map((item) => item.id));
-  const normalizeTheme = (value) => (themeIds.has(value) ? value : "midnight");
 
   useEffect(() => {
     // Check for invite token in URL
@@ -179,8 +253,13 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem("nexgrex-theme", theme);
+    } catch {
+      // ignore storage errors
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -370,7 +449,7 @@ export default function App() {
     setImageFile(null);
     setImagePreview("");
     setActiveUser("");
-    setTheme("atlas");
+    setTheme("midnight");
     setView("chat");
     setMenuOpen(false);
     setStatus("logged-out");
@@ -542,85 +621,6 @@ export default function App() {
     }
   };
 
-  const TitleBar = ({
-    title,
-    onBack,
-    showMenu,
-    onAvatarClick,
-    avatarDisabled
-  }) => (
-    <div className="title-bar">
-      <div className="title-left">
-        {onBack ? (
-          <button type="button" className="ghost back" onClick={onBack}>
-            Back
-          </button>
-        ) : (
-          <span />
-        )}
-      </div>
-      <div className="title-center">{title}</div>
-      <div className="title-right">
-        <button
-          type="button"
-          className="avatar-button"
-          onClick={avatarDisabled ? undefined : onAvatarClick}
-          disabled={avatarDisabled || !onAvatarClick}
-        >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="Avatar" />
-          ) : (
-            <span>{activeUser ? activeUser[0]?.toUpperCase() : "?"}</span>
-          )}
-        </button>
-        {showMenu && (
-          <div className="menu">
-            <button
-              type="button"
-              onClick={() => {
-                setProfileModalOpen(true);
-                setMenuOpen(false);
-              }}
-            >
-              👤 Profile
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setThemesModalOpen(true);
-                setMenuOpen(false);
-              }}
-            >
-              🎨 Themes
-            </button>
-            <div className="menu-divider" />
-            <button
-              type="button"
-              onClick={() => {
-                handleGenerateInvite();
-                setMenuOpen(false);
-              }}
-              disabled={inviteLoading}
-              className="menu-action"
-            >
-              {inviteLoading ? "Generating..." : "🔗 Generate Invite"}
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                await handleLogout();
-                setMenuOpen(false);
-              }}
-              className="menu-action"
-            >
-              ✌️ Log-out
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   const handleSend = (event) => {
     event.preventDefault();
     if (!socketRef.current || uploading) {
@@ -790,6 +790,13 @@ export default function App() {
                 onBack={null}
                 showMenu={menuOpen}
                 onAvatarClick={() => setMenuOpen((prev) => !prev)}
+                avatarUrl={avatarUrl}
+                activeUser={activeUser}
+                inviteLoading={inviteLoading}
+                onOpenProfile={() => { setProfileModalOpen(true); setMenuOpen(false); }}
+                onOpenThemes={() => { setThemesModalOpen(true); setMenuOpen(false); }}
+                onGenerateInvite={() => { handleGenerateInvite(); setMenuOpen(false); }}
+                onLogout={async () => { await handleLogout(); setMenuOpen(false); }}
               />
               {inviteToken && (
                 <div className="invite-display">
@@ -988,6 +995,13 @@ export default function App() {
                 showMenu={false}
                 onAvatarClick={null}
                 avatarDisabled
+                avatarUrl={avatarUrl}
+                activeUser={activeUser}
+                inviteLoading={inviteLoading}
+                onOpenProfile={() => { setProfileModalOpen(true); setMenuOpen(false); }}
+                onOpenThemes={() => { setThemesModalOpen(true); setMenuOpen(false); }}
+                onGenerateInvite={() => { handleGenerateInvite(); setMenuOpen(false); }}
+                onLogout={async () => { await handleLogout(); setMenuOpen(false); }}
               />
               <div className="options">
                 <div className="section-title">Profile</div>
@@ -1006,7 +1020,7 @@ export default function App() {
                 </div>
                 <div className="section-title">Themes</div>
                 <div className="theme-grid">
-                  {themes.map((item) => (
+                  {THEMES.map((item) => (
                     <button
                       type="button"
                       key={item.id}
@@ -1116,7 +1130,7 @@ export default function App() {
                 </div>
                 <div className="modal-body">
                   <div className="theme-grid">
-                    {themes.map((item) => (
+                    {THEMES.map((item) => (
                       <button
                         type="button"
                         key={item.id}

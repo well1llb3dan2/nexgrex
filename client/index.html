@@ -18,6 +18,11 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // Restore theme before React renders to prevent flash of unstyled content
+      try {
+        var _t = localStorage.getItem("nexgrex-theme") || "midnight";
+        document.documentElement.dataset.theme = _t;
+      } catch (e) {}
       // Register service worker for PWA support
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/service-worker.js').catch((err) => {

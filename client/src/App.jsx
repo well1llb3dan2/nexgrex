@@ -747,23 +747,32 @@ export default function App() {
                     </div>
                   )}
                   {messages.map((msg) => (
-                    <div className="message" key={msg.id}>
-                      <div className="meta">
-                        <span className="user">{msg.user}</span>
-                        <span className="time">
-                          {new Date(msg.ts).toLocaleTimeString()}
-                        </span>
+                    <div className="message-row" key={msg.id}>
+                      <div className="message-avatar" aria-hidden="true">
+                        {msg.avatarUrl ? (
+                          <img src={msg.avatarUrl} alt="" loading="lazy" />
+                        ) : (
+                          <span>{msg.user ? msg.user[0]?.toUpperCase() : "?"}</span>
+                        )}
                       </div>
-                      {msg.text && <p>{msg.text}</p>}
-                      {msg.imageUrl && (
-                        <img
-                          className="message-image"
-                          src={msg.imageUrl}
-                          alt="Uploaded"
-                          loading="lazy"
-                          onClick={() => setSelectedImageUrl(msg.imageUrl)}
-                        />
-                      )}
+                      <div className="message">
+                        <div className="meta">
+                          <span className="user">{msg.user}</span>
+                          <span className="time">
+                            {new Date(msg.ts).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        {msg.text && <p>{msg.text}</p>}
+                        {msg.imageUrl && (
+                          <img
+                            className="message-image"
+                            src={msg.imageUrl}
+                            alt="Uploaded"
+                            loading="lazy"
+                            onClick={() => setSelectedImageUrl(msg.imageUrl)}
+                          />
+                        )}
+                      </div>
                     </div>
                   ))}
                   <div ref={messagesEndRef} />

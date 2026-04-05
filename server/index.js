@@ -535,6 +535,11 @@ io.use(async (socket, next) => {
     }
 
     socket.data.username = session.username;
+    const user = await usersCollection.findOne(
+      { username: session.username },
+      { projection: { avatarUrl: 1 } }
+    );
+    socket.data.avatarUrl = user?.avatarUrl || "";
     return next();
   } catch (error) {
     return next(new Error("unauthorized"));
@@ -550,8 +555,20 @@ io.on("connection", (socket) => {
     .sort({ ts: -1 })
     .limit(200)
     .toArray()
-    .then((docs) => {
-      socket.emit("history", { messages: docs.reverse() });
+    .then(async (docs) => {
+      const usernames = [...new Set(docs.map((doc) => doc.user).filter(Boolean))];
+      const users = usernames.length
+        ? await usersCollection
+            .find({ username: { $in: usernames } })
+            .project({ username: 1, avatarUrl: 1 })
+            .toArray()
+        : [];
+      const avatarByUser = new Map(users.map((user) => [user.username, user.avatarUrl || ""]));
+      const messages = docs.reverse().map((doc) => ({
+        ...doc,
+        avatarUrl: doc.avatarUrl || avatarByUser.get(doc.user) || ""
+      }));
+      socket.emit("history", { messages });
     })
     .catch(() => {
       socket.emit("history", { messages: [] });
@@ -580,6 +597,7 @@ io.on("connection", (socket) => {
     const msg = {
       id: uuidv4(),
       user: socket.data.username,
+      avatarUrl: socket.data.avatarUrl || "",
       text: trimmed,
       imageUrl,
       imageType,

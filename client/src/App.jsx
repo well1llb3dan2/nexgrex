@@ -35,6 +35,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+  const [imageUploadModalOpen, setImageUploadModalOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -45,7 +46,10 @@ export default function App() {
   const [inviteToken, setInviteToken] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState(null);
+  const [avatarUploadModalOpen, setAvatarUploadModalOpen] = useState(false);
   const socketRef = useRef(null);
+  const avatarUploadRef = useRef(null);
+  const avatarCameraRef = useRef(null);
   const messagesEndRef = useRef(null);
   const qrRef = useRef(null);
   const themes = [
@@ -305,9 +309,7 @@ export default function App() {
     setConnected(false);
   };
 
-  const handleAvatarChange = async (event) => {
-    const file = event.target.files && event.target.files[0];
-    event.target.value = "";
+  const uploadAvatarFile = async (file) => {
     if (!file) {
       return;
     }
@@ -317,26 +319,56 @@ export default function App() {
     }
     setError("");
     setAvatarUploading(true);
+    setAvatarUploadModalOpen(false);
 
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/api/avatar", {
-      method: "POST",
-      credentials: "include",
-      body: formData
-    });
+    try {
+      const res = await fetch("/api/avatar", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Avatar upload failed.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Avatar upload failed.");
+        setAvatarUploading(false);
+        return;
+      }
+
+      const data = await res.json();
+      setAvatarUrl(data.avatarUrl || "");
       setAvatarUploading(false);
-      return;
+    } catch (err) {
+      setError("Avatar upload failed.");
+      setAvatarUploading(false);
     }
+  };
 
-    const data = await res.json();
-    setAvatarUrl(data.avatarUrl || "");
-    setAvatarUploading(false);
+  const handleAvatarUploadChange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (avatarUploadRef.current) {
+      avatarUploadRef.current.value = "";
+    }
+    await uploadAvatarFile(file);
+  };
+
+  const handleAvatarCameraChange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (avatarCameraRef.current) {
+      avatarCameraRef.current.value = "";
+    }
+    await uploadAvatarFile(file);
+  };
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (event.target) {
+      event.target.value = "";
+    }
+    await uploadAvatarFile(file);
   };
 
   const handleImageChange = (event) => {
@@ -738,46 +770,88 @@ export default function App() {
                 </div>
 
                 <form className="composer" onSubmit={handleSend}>
-                  <div className="composer-input">
-                    <input
-                      value={text}
-                      onChange={(event) => setText(event.target.value)}
-                      placeholder="Say something bright"
-                    />
-                    {imagePreview && (
-                      <div className="image-preview">
-                        <img src={imagePreview} alt="Preview" />
-                        <button type="button" onClick={clearImage}>
-                          Remove
-                        </button>
-                      </div>
-                    )}
+                  <button
+                    type="button"
+                    className="composer-icon-button"
+                    onClick={() => setImageUploadModalOpen(true)}
+                    title="Upload image"
+                  >
+                    📸
+                  </button>
+                  <input
+                    value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    placeholder="Say something bright"
+                    className="composer-input"
+                  />
+                  <button type="submit" className="composer-icon-button" disabled={uploading} title="Send message">
+                    {uploading ? "…" : "✈️"}
+                  </button>
+                </form>
+                {imagePreview && (
+                  <div className="image-preview-inline">
+                    <img src={imagePreview} alt="Preview" />
+                    <button type="button" onClick={clearImage} className="delete-preview">
+                      ✕
+                    </button>
                   </div>
-                  <div className="composer-actions">
-                    <label className="ghost attach">
-                      Upload
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Image Upload Modal */}
+          {imageUploadModalOpen && (
+            <div className="modal-overlay" onClick={() => setImageUploadModalOpen(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>📸 Upload Image</h3>
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={() => setImageUploadModalOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="modal-section">
+                    <label className="upload-option">
+                      <div className="upload-icon">📁</div>
+                      <span>Choose from Gallery</span>
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={handleImageChange}
+                        onChange={(e) => {
+                          handleImageChange(e);
+                          setImageUploadModalOpen(false);
+                        }}
                       />
                     </label>
-                    <label className="ghost attach">
-                      Camera
+                    <label className="upload-option">
+                      <div className="upload-icon">📷</div>
+                      <span>Take a Photo</span>
                       <input
                         type="file"
                         accept="image/*"
                         capture="environment"
-                        onChange={handleImageChange}
+                        onChange={(e) => {
+                          handleImageChange(e);
+                          setImageUploadModalOpen(false);
+                        }}
                       />
                     </label>
-                    <button type="submit" className="cta small" disabled={uploading}>
-                      {uploading ? "Sending..." : "Send"}
-                    </button>
                   </div>
-                </form>
+                  {imagePreview && (
+                    <div className="modal-section">
+                      <button type="button" className="danger" onClick={() => { clearImage(); setImageUploadModalOpen(false); }}>
+                        Clear Selection
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* Image Lightbox Modal */}
@@ -875,21 +949,62 @@ export default function App() {
                 </div>
                 <div className="modal-body">
                   <div className="modal-section">
-                    <label className="avatar-upload-label">
-                      {avatarUrl && <img src={avatarUrl} alt="Current avatar" className="avatar-preview" />}
-                      <div className="upload-button">
-                        {avatarUploading ? "Uploading..." : "📸 Update avatar"}
-                      </div>
+                    {avatarUrl && <img src={avatarUrl} alt="Current avatar" className="avatar-preview" />}
+                    <button
+                      type="button"
+                      className="cta"
+                      onClick={() => setAvatarUploadModalOpen(true)}
+                      disabled={avatarUploading}
+                    >
+                      {avatarUploading ? "Uploading..." : "📸 Update avatar"}
+                    </button>
+                  </div>
+                  {error && <p className="error">{error}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Avatar Upload Modal */}
+          {avatarUploadModalOpen && (
+            <div className="modal-overlay" onClick={() => setAvatarUploadModalOpen(false)}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>📸 Update Avatar</h3>
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={() => setAvatarUploadModalOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="modal-section" style={{ gap: "12px" }}>
+                    <label className="cta">
+                      📷 Take Photo
                       <input
+                        ref={avatarCameraRef}
                         type="file"
                         accept="image/*"
                         capture="environment"
-                        onChange={handleAvatarChange}
+                        onChange={handleAvatarCameraChange}
                         disabled={avatarUploading}
+                        style={{ display: "none" }}
+                      />
+                    </label>
+                    <label className="cta">
+                      📁 Upload Photo
+                      <input
+                        ref={avatarUploadRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUploadChange}
+                        disabled={avatarUploading}
+                        style={{ display: "none" }}
                       />
                     </label>
                   </div>
-                  {error && <p className="error">{error}</p>}
                 </div>
               </div>
             </div>

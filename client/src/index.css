@@ -576,6 +576,8 @@
   .avatar-button {
     width: 48px;
     height: 48px;
+    padding: 0;
+    box-sizing: border-box;
     border-radius: var(--radius-pill);
     border: 2px solid var(--secondary);
     background: linear-gradient(135deg, var(--surface-muted), var(--surface));
@@ -602,7 +604,9 @@
     img {
       width: 100%;
       height: 100%;
+      display: block;
       object-fit: cover;
+      object-position: center;
     }
   }
 
@@ -1688,9 +1692,7 @@
       margin-top: 8px;
       max-height: 280px;
     }
-  }
-}
-  }
+ 
 
   .image-preview {
     padding: 8px;
@@ -1743,4 +1745,5 @@
   .qr-arrow {
     font-size: 1.2rem;
   }
+}
 }

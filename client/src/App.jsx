@@ -7,6 +7,9 @@ const socketOptions = {
   withCredentials: true
 };
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const AVATAR_MAX_DIMENSION = 1024;
+const AVATAR_OUTPUT_TYPE = "image/jpeg";
+const AVATAR_OUTPUT_QUALITY = 0.82;
 const GLOBAL_ROOM_ID = "global";
 
 // Theme color mapping for QR codes
@@ -17,6 +20,71 @@ const themeColors = {
   "sunset-blaze": { primary: "#f97316", bg: "#fef3c7" },
   "royal-arcade": { primary: "#a855f7", bg: "#faf5ff" },
   "midnight": { primary: "#06b6d4", bg: "#0f172a" }
+};
+
+const loadImageFromFile = (file) =>
+  new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not decode image."));
+    };
+
+    image.src = objectUrl;
+  });
+
+const resizeAvatarForUpload = async (file) => {
+  if (!file || !file.type.startsWith("image/")) {
+    return file;
+  }
+
+  const image = await loadImageFromFile(file);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+
+  if (!sourceWidth || !sourceHeight) {
+    return file;
+  }
+
+  const scale = Math.min(1, AVATAR_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight));
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+  // Keep smaller avatars untouched unless they are still heavy.
+  if (scale === 1 && file.size <= 1.5 * 1024 * 1024) {
+    return file;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    return file;
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const blob = await new Promise((resolve) => {
+    canvas.toBlob(resolve, AVATAR_OUTPUT_TYPE, AVATAR_OUTPUT_QUALITY);
+  });
+
+  if (!blob || blob.size === 0) {
+    return file;
+  }
+
+  const stem = (file.name || "avatar").replace(/\.[^.]+$/, "") || "avatar";
+  return new File([blob], `${stem}.jpg`, {
+    type: AVATAR_OUTPUT_TYPE,
+    lastModified: Date.now()
+  });
 };
 
 export default function App() {
@@ -321,8 +389,21 @@ export default function App() {
     setAvatarUploading(true);
     setAvatarUploadModalOpen(false);
 
+    let uploadFile = file;
+    try {
+      uploadFile = await resizeAvatarForUpload(file);
+    } catch (err) {
+      uploadFile = file;
+    }
+
+    if (uploadFile.size > MAX_IMAGE_BYTES) {
+      setError("Avatar is still too large after resize. Try a smaller image.");
+      setAvatarUploading(false);
+      return;
+    }
+
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", uploadFile);
 
     try {
       const res = await fetch("/api/avatar", {

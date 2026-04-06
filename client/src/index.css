@@ -1436,4 +1436,10 @@
       font-size: 1.1rem;
     }
   }
+
+  @media (display-mode: standalone) {
+    .page {
+      padding-top: max(calc(var(--safe-top) + 12px), 36px);
+    }
+  }
 }

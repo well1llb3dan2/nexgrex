@@ -935,10 +935,15 @@
     border: none;
     color: var(--ink);
     font-size: 1rem;
-    padding: 8px 0;
+    padding: 8px 10px;
     outline: none;
     font-family: inherit;
     min-width: 0;
+
+    &:focus {
+      box-shadow: none;
+      transform: none;
+    }
 
     &::placeholder {
       color: var(--muted);
@@ -1356,7 +1361,7 @@
 
     .composer-input {
       font-size: 0.95rem;
-      padding: 6px 0;
+      padding: 6px 8px;
     }
 
     .messages {

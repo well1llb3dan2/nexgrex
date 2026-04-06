@@ -30,6 +30,8 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET = process.env.R2_BUCKET;
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const HISTORY_DAY_PAGE_SIZE = 3;
+const HISTORY_SCAN_LIMIT = 4000;
 const DEFAULT_THEME = "midnight";
 const THEMES = new Set(["neon-dreams", "vintage-groove", "ocean-zen", "sunset-blaze", "royal-arcade", "midnight"]);
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -86,6 +88,73 @@ let messagesCollection;
 let invitesCollection;
 
 const GLOBAL_ROOM_ID = "global";
+
+async function hydrateMessagesWithAvatars(docs) {
+  if (!docs.length) {
+    return [];
+  }
+
+  const usernames = [...new Set(docs.map((doc) => doc.user).filter(Boolean))];
+  const users = usernames.length
+    ? await usersCollection
+        .find({ username: { $in: usernames } })
+        .project({ username: 1, avatarUrl: 1 })
+        .toArray()
+    : [];
+
+  const avatarByUser = new Map(users.map((user) => [user.username, user.avatarUrl || ""]));
+  return docs.map((doc) => ({
+    ...doc,
+    avatarUrl: doc.avatarUrl || avatarByUser.get(doc.user) || ""
+  }));
+}
+
+async function loadMessageHistoryPage({ beforeTs = null, dayCount = HISTORY_DAY_PAGE_SIZE } = {}) {
+  const numericBeforeTs = Number(beforeTs);
+  const query = Number.isFinite(numericBeforeTs) && numericBeforeTs > 0 ? { ts: { $lt: numericBeforeTs } } : {};
+
+  const docs = await messagesCollection.find(query).sort({ ts: -1 }).limit(HISTORY_SCAN_LIMIT).toArray();
+  if (!docs.length) {
+    return {
+      messages: [],
+      hasMore: false,
+      nextBeforeTs: null
+    };
+  }
+
+  const selected = [];
+  const seenDays = new Set();
+  const maxDays = Math.max(1, Number(dayCount) || HISTORY_DAY_PAGE_SIZE);
+
+  for (const doc of docs) {
+    const dayKey = new Date(doc.ts).toDateString();
+    if (!seenDays.has(dayKey)) {
+      if (seenDays.size >= maxDays) {
+        break;
+      }
+      seenDays.add(dayKey);
+    }
+    selected.push(doc);
+  }
+
+  if (!selected.length) {
+    return {
+      messages: [],
+      hasMore: false,
+      nextBeforeTs: null
+    };
+  }
+
+  const earliestTs = selected[selected.length - 1].ts;
+  const hasMore = !!(await messagesCollection.findOne({ ts: { $lt: earliestTs } }, { projection: { _id: 1 } }));
+  const hydrated = await hydrateMessagesWithAvatars(selected);
+
+  return {
+    messages: hydrated.reverse(),
+    hasMore,
+    nextBeforeTs: earliestTs
+  };
+}
 
 // Security headers
 app.use(helmet({
@@ -550,29 +619,27 @@ io.on("connection", (socket) => {
   socket.data.activeRoom = GLOBAL_ROOM_ID;
   socket.join(GLOBAL_ROOM_ID);
 
-  messagesCollection
-    .find({})
-    .sort({ ts: -1 })
-    .limit(200)
-    .toArray()
-    .then(async (docs) => {
-      const usernames = [...new Set(docs.map((doc) => doc.user).filter(Boolean))];
-      const users = usernames.length
-        ? await usersCollection
-            .find({ username: { $in: usernames } })
-            .project({ username: 1, avatarUrl: 1 })
-            .toArray()
-        : [];
-      const avatarByUser = new Map(users.map((user) => [user.username, user.avatarUrl || ""]));
-      const messages = docs.reverse().map((doc) => ({
-        ...doc,
-        avatarUrl: doc.avatarUrl || avatarByUser.get(doc.user) || ""
-      }));
-      socket.emit("history", { messages });
+  loadMessageHistoryPage()
+    .then((page) => {
+      socket.emit("history", page);
     })
     .catch(() => {
-      socket.emit("history", { messages: [] });
+      socket.emit("history", { messages: [], hasMore: false, nextBeforeTs: null });
     });
+
+  socket.on("loadOlderMessages", async (payload) => {
+    try {
+      const beforeTs = Number(payload && payload.beforeTs);
+      if (!Number.isFinite(beforeTs) || beforeTs <= 0) {
+        return;
+      }
+
+      const page = await loadMessageHistoryPage({ beforeTs });
+      socket.emit("history:older", page);
+    } catch (error) {
+      socket.emit("history:older", { messages: [], hasMore: false, nextBeforeTs: null });
+    }
+  });
 
   socket.on("message", async (payload) => {
     if (!payload || typeof payload !== "object") {

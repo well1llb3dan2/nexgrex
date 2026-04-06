@@ -139,7 +139,6 @@
     margin: 0;
     padding: 0;
     height: 100%;
-    height: 100dvh;
     overflow: hidden;
   }
 
@@ -156,11 +155,11 @@
   }
 
   #root {
-    position: relative;
+    position: fixed;
+    inset: 0;
     z-index: 1;
     display: flex;
     flex-direction: column;
-    height: 100%;
     overflow: hidden;
   }
 }

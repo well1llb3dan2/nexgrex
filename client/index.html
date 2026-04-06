@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="app-booting">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -24,18 +24,7 @@
         document.documentElement.dataset.theme = _t;
       } catch (e) {}
 
-      // Prevent rapid startup flicker by disabling transitions/animations briefly.
-      (function () {
-        var root = document.documentElement;
-        var clearBootClass = function () {
-          root.classList.remove("app-booting");
-        };
-        window.addEventListener("load", function () {
-          requestAnimationFrame(function () {
-            setTimeout(clearBootClass, 900);
-          });
-        });
-      })();
+
     </script>
   </body>
 </html>

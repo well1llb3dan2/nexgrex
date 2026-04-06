@@ -282,6 +282,7 @@ export default function App() {
   const skipAutoScrollRef = useRef(false);
   const lastNotifiedMessageIdRef = useRef(null);
   const activeUserRef = useRef("");
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => {
     activeUserRef.current = activeUser || "";
@@ -463,7 +464,7 @@ export default function App() {
         notifyIncomingMessage(message);
       }
 
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => [...prev, { ...message, _live: true }]);
     });
 
     socket.connect();
@@ -562,7 +563,10 @@ export default function App() {
       return;
     }
 
-    messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current.scrollIntoView({ behavior: initialLoadDoneRef.current ? "smooth" : "instant" });
+    if (!initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true;
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -969,9 +973,7 @@ export default function App() {
         </section>
       )}
 
-      {status === "checking" && (
-        <section className="card status">Checking session...</section>
-      )}
+      {status === "checking" && null}
 
       {status === "logged-in" && (
         <section className="card app-shell">
@@ -1048,7 +1050,7 @@ export default function App() {
                         </div>
                       )}
                       <div className={isOwn ? "message-row own" : "message-row"}>
-                        <div className="message">
+                        <div className={msg._live ? "message animate-in" : "message"}>
                           {msg.text && <p>{msg.text}</p>}
                           {msg.imageUrl && (
                             <img

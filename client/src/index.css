@@ -140,13 +140,6 @@
     padding: 0;
   }
 
-  html.app-booting *,
-  html.app-booting *::before,
-  html.app-booting *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-
   body {
     font-family: var(--font-body);
     color: var(--ink);
@@ -266,7 +259,6 @@
     box-shadow: var(--shadow);
     backdrop-filter: blur(10px);
     border: var(--border-width) solid var(--border-color);
-    animation: floatIn 0.5s var(--ease-smooth);
   }
 
   .badge {
@@ -839,8 +831,11 @@
     border-bottom: 0;
     width: fit-content;
     max-width: 100%;
-    animation: messageSlideIn 0.3s var(--ease-bounce);
     transition: all 0.2s ease;
+
+    &.animate-in {
+      animation: messageSlideIn 0.3s var(--ease-bounce);
+    }
 
     &:hover {
       box-shadow: var(--shadow-sm);

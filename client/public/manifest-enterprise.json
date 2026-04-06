@@ -7,12 +7,11 @@
   "scope": "/",
   "id": "nexgrex-app",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "dir": "ltr",
   "lang": "en-US",
-  "background_color": "#ffffff",
-  "theme_color": "#06b6d4",
+  "background_color": "#0a0c10",
+  "theme_color": "#0a0c10",
   "prefer_related_applications": false,
   "icons": [
     {

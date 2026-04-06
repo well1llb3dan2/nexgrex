@@ -282,9 +282,15 @@
   }
 
   .theme-toggle {
-    min-width: 72px;
+    min-width: auto;
     font-weight: 700;
     letter-spacing: 0.2px;
+    white-space: nowrap;
+    width: auto;
+  }
+
+  .theme-icon {
+    display: none;
   }
 
   .avatar-button {
@@ -732,6 +738,21 @@
     min-height: 0;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.15) transparent;
+  }
+
+  .messages::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .messages::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .messages::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.15);
+    border-radius: 3px;
   }
 
   .message-row {
@@ -792,10 +813,9 @@
 
   .message {
     background: var(--surface-strong);
-    border-radius: var(--radius-soft) var(--radius-soft) 0 0;
+    border-radius: var(--radius-soft);
     padding: 14px 16px;
     border: var(--border-width) solid var(--border-color);
-    border-bottom: 0;
     width: fit-content;
     max-width: 100%;
 
@@ -831,10 +851,10 @@
     padding: 6px 10px 7px;
     border: var(--border-width) solid var(--border-color);
     border-top: var(--border-width) solid var(--border-color);
-    border-radius: 0 0 var(--radius-soft) var(--radius-soft);
-    background: var(--message-footer-bg);
+    border-radius: var(--radius-soft);
+    background: transparent;
     width: fit-content;
-    margin-top: 0;
+    margin-top: 1px;
   }
 
   .message-footer .message-avatar {
@@ -870,7 +890,7 @@
     justify-content: flex-end;
     text-align: right;
     border-color: rgba(106, 227, 193, 0.4);
-    background: rgba(106, 227, 193, 0.08);
+    background: transparent;
   }
 
   .message-image {
@@ -1367,6 +1387,21 @@
     .messages {
       gap: 8px;
       padding-right: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(128, 128, 128, 0.15) transparent;
+    }
+
+    .messages::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: rgba(128, 128, 128, 0.15);
+      border-radius: 3px;
     }
 
     .message-row {
@@ -1416,6 +1451,19 @@
     .ghost.small {
       padding: 8px 12px;
       width: 100%;
+    }
+
+    .ghost.small.theme-toggle {
+      width: auto;
+      padding: 8px;
+    }
+
+    .theme-toggle .theme-label {
+      display: none;
+    }
+
+    .theme-toggle .theme-icon {
+      display: inline;
     }
 
     .invite-qr {

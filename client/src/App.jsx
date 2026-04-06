@@ -124,7 +124,7 @@ function TitleBar({
             aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
             title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
           >
-            {theme === "light" ? "Dark" : "Light"}
+            {theme === "light" ? (<><span className="theme-icon">🌙</span><span className="theme-label">Dark</span></>) : (<><span className="theme-icon">☀️</span><span className="theme-label">Light</span></>)}
           </button>
         )}
       </div>
@@ -1073,10 +1073,7 @@ export default function App() {
                             </div>
                           )}
                           {isOwn ? (
-                            <>
-                              <span className="time">{formattedTime}</span>
-                              <span className="user">{msg.user}</span>
-                            </>
+                            <span className="time">{formattedTime}</span>
                           ) : (
                             <>
                               <span className="user">{msg.user}</span>

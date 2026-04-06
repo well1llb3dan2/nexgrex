@@ -257,7 +257,6 @@
     border-radius: var(--radius-card);
     padding: 30px;
     box-shadow: var(--shadow);
-    backdrop-filter: blur(10px);
     border: var(--border-width) solid var(--border-color);
   }
 
@@ -285,7 +284,6 @@
     background: rgba(255, 255, 255, 0.04);
     border-bottom: 1px solid var(--border-color);
     border-radius: 16px;
-    backdrop-filter: blur(12px);
     position: relative;
     z-index: 40;
   }
@@ -334,7 +332,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.25s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
     box-shadow: var(--shadow-sm);
 
     &:hover {
@@ -386,7 +384,7 @@
       cursor: pointer;
       padding: 10px 14px;
       border-radius: 12px;
-      transition: all 0.2s ease;
+      transition: background 0.2s ease, transform 0.2s ease;
       font-family: inherit;
 
       &:hover {
@@ -418,7 +416,7 @@
       cursor: pointer;
       padding: 10px 14px;
       border-radius: 12px;
-      transition: all 0.2s ease;
+      transition: background 0.2s ease, transform 0.2s ease;
       font-family: inherit;
 
       &:hover {
@@ -489,7 +487,7 @@
     font-size: 1.5rem;
     cursor: pointer;
     color: var(--muted);
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, transform 0.2s ease;
     padding: 0;
     width: 32px;
     height: 32px;
@@ -549,7 +547,7 @@
     font-size: 2rem;
     cursor: pointer;
     color: var(--primary);
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, transform 0.2s ease;
     padding: 8px;
     display: flex;
     align-items: center;
@@ -577,7 +575,7 @@
       border: none;
       font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
@@ -621,7 +619,7 @@
     font-size: 1rem;
     background: var(--input-bg);
     color: var(--ink);
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     font-family: inherit;
 
     &:focus {
@@ -655,7 +653,7 @@
     border-radius: var(--radius-pill);
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
     font-family: inherit;
     font-size: 0.95rem;
 
@@ -684,7 +682,7 @@
     font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.3s var(--ease-smooth);
+    transition: transform 0.3s var(--ease-smooth), box-shadow 0.3s var(--ease-smooth);
     box-shadow: var(--button-shadow);
     position: relative;
     overflow: hidden;
@@ -727,7 +725,7 @@
     border-radius: var(--radius-button);
     cursor: pointer;
     color: var(--ink);
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     font-weight: 600;
     font-family: inherit;
     font-size: 0.95rem;
@@ -831,15 +829,9 @@
     border-bottom: 0;
     width: fit-content;
     max-width: 100%;
-    transition: all 0.2s ease;
 
     &.animate-in {
       animation: messageSlideIn 0.3s var(--ease-bounce);
-    }
-
-    &:hover {
-      box-shadow: var(--shadow-sm);
-      transform: translateY(-2px);
     }
 
     p {
@@ -921,7 +913,7 @@
     border-radius: var(--radius-soft);
     border: var(--border-width) solid var(--border-color);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 
     &:hover {
       transform: scale(1.02);
@@ -936,7 +928,6 @@
     padding: 12px 14px;
     border-radius: 18px;
     border: 1px solid var(--border-color);
-    backdrop-filter: blur(10px);
     align-items: center;
   }
 
@@ -947,7 +938,7 @@
     cursor: pointer;
     padding: 8px;
     border-radius: 10px;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s ease;
     color: var(--primary);
     flex-shrink: 0;
 
@@ -1194,7 +1185,7 @@
     border: none;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     width: 100%;
 
     &:hover {

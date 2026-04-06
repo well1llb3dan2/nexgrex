@@ -281,6 +281,11 @@ export default function App() {
   const preserveScrollRef = useRef(null);
   const skipAutoScrollRef = useRef(false);
   const lastNotifiedMessageIdRef = useRef(null);
+  const activeUserRef = useRef("");
+
+  useEffect(() => {
+    activeUserRef.current = activeUser || "";
+  }, [activeUser]);
 
   const notifyIncomingMessage = async (message) => {
     if (typeof window === "undefined" || typeof Notification === "undefined") {
@@ -363,9 +368,13 @@ export default function App() {
   }, []);
 
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    if (document.documentElement.dataset.theme !== theme) {
+      document.documentElement.dataset.theme = theme;
+    }
     try {
-      window.localStorage.setItem("nexgrex-theme", theme);
+      if (window.localStorage.getItem("nexgrex-theme") !== theme) {
+        window.localStorage.setItem("nexgrex-theme", theme);
+      }
     } catch {
       // Ignore storage errors.
     }
@@ -448,7 +457,7 @@ export default function App() {
         return;
       }
 
-      const isOwn = Boolean(activeUser && message.user === activeUser);
+      const isOwn = Boolean(activeUserRef.current && message.user === activeUserRef.current);
       if (!isOwn) {
         lastNotifiedMessageIdRef.current = message.id || null;
         notifyIncomingMessage(message);
@@ -466,7 +475,7 @@ export default function App() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [status, activeUser]);
+  }, [status]);
 
   useEffect(() => {
     if (status !== "logged-in") {

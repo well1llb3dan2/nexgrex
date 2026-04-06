@@ -53,7 +53,7 @@
     --token-bg: rgba(8, 12, 20, 0.7);
     --token-bg-soft: rgba(8, 12, 20, 0.6);
     --qr-canvas-bg: #0b0f14;
-    --menu-bg: linear-gradient(160deg, rgba(18, 28, 44, 0.98), rgba(10, 16, 26, 0.98));
+    --menu-bg: linear-gradient(160deg, rgb(18, 28, 44), rgb(10, 16, 26));
     --menu-border: rgba(255, 255, 255, 0.12);
     --menu-hover-bg: rgba(106, 227, 193, 0.1);
 
@@ -111,7 +111,7 @@
     --token-bg: rgba(236, 243, 255, 0.95);
     --token-bg-soft: rgba(241, 247, 255, 0.94);
     --qr-canvas-bg: #f7fbff;
-    --menu-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(242, 248, 255, 0.98));
+    --menu-bg: linear-gradient(160deg, rgb(255, 255, 255), rgb(242, 248, 255));
     --menu-border: rgba(13, 32, 51, 0.16);
     --menu-hover-bg: rgba(13, 140, 117, 0.1);
 
@@ -137,6 +137,13 @@
     height: 100%;
     margin: 0;
     padding: 0;
+  }
+
+  html.app-booting *,
+  html.app-booting *::before,
+  html.app-booting *::after {
+    animation: none !important;
+    transition: none !important;
   }
 
   body {
@@ -369,6 +376,8 @@
     border: 1px solid var(--menu-border);
     min-width: 190px;
     z-index: 200;
+    isolation: isolate;
+    opacity: 1;
     animation: dropIn 0.2s var(--ease-bounce);
 
     button {

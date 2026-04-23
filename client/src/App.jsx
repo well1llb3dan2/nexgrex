@@ -181,7 +181,9 @@ function TitleBar({
   onLogout,
   connected,
   onlineCount,
-  onlineUsers
+  onlineUsers,
+  notifPermission,
+  onEnableNotifications
 }) {
   const presenceTitle = onlineUsers && onlineUsers.length
     ? `Online: ${onlineUsers.join(", ")}`
@@ -258,6 +260,27 @@ function TitleBar({
               <span>Profile</span>
             </button>
             <div className="menu-divider" />
+            {notifPermission === "default" && onEnableNotifications && (
+              <button type="button" onClick={onEnableNotifications} className="menu-action menu-item">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 3a7 7 0 0 0-7 7v4l-1.5 2.5h17L19 14v-4a7 7 0 0 0-7-7z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M10 19a2 2 0 0 0 4 0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span>Enable Notifications</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onGenerateInvite}
@@ -369,6 +392,12 @@ export default function App() {
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUserList, setTypingUserList] = useState([]);
+  const [notifPermission, setNotifPermission] = useState(() => {
+    if (typeof window !== "undefined" && typeof Notification !== "undefined") {
+      return Notification.permission;
+    }
+    return "default";
+  });
   const socketRef = useRef(null);
   const avatarUploadRef = useRef(null);
   const avatarCameraRef = useRef(null);
@@ -404,8 +433,11 @@ export default function App() {
     const body = buildNotificationBody(message);
     const options = {
       body,
-      tag: message.id || `msg-${Date.now()}`,
-      renotify: false
+      icon: "/icon-192.svg",
+      badge: "/icon-monochrome.svg",
+      tag: "nexgrex-chat",
+      renotify: true,
+      data: { url: "/" }
     };
 
     try {
@@ -498,9 +530,7 @@ export default function App() {
     }
 
     if (typeof window !== "undefined" && typeof Notification !== "undefined") {
-      if (Notification.permission === "default") {
-        Notification.requestPermission().catch(() => {});
-      }
+      setNotifPermission(Notification.permission);
     }
   }, [status]);
 
@@ -1024,6 +1054,15 @@ export default function App() {
     setTheme((prev) => (prev === "light" ? "midnight" : "light"));
   };
 
+  const handleEnableNotifications = () => {
+    if (typeof Notification === "undefined") {
+      return;
+    }
+    Notification.requestPermission().then((permission) => {
+      setNotifPermission(permission);
+    }).catch(() => {});
+  };
+
   const formatMessageDate = (timestamp) =>
     new Date(timestamp).toLocaleDateString([], {
       weekday: "short",
@@ -1158,6 +1197,8 @@ export default function App() {
               connected={connected}
               onlineCount={onlineUsers.length}
               onlineUsers={onlineUsers}
+              notifPermission={notifPermission}
+              onEnableNotifications={handleEnableNotifications}
             />
             {inviteToken && (
               <div className="invite-display">

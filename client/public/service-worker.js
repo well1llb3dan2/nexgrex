@@ -20,12 +20,17 @@ self.addEventListener('activate', (event) => {
 // Push / notification support only — no fetch handler.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
+      // Focus an existing app window if one is open.
+      for (const client of clientList) {
+        if ('focus' in client) {
+          return client.focus();
+        }
       }
-      return self.clients.openWindow('/');
+      // Otherwise open a fresh window at the target URL.
+      return self.clients.openWindow(targetUrl);
     })
   );
 });

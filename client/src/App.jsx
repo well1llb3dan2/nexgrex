@@ -7,11 +7,82 @@ const socketOptions = {
   withCredentials: true
 };
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_MESSAGE_LENGTH = 500;
+const MESSAGE_LENGTH_WARNING = 450;
+const TYPING_EMIT_INTERVAL_MS = 2500;
+const TYPING_STOP_DEBOUNCE_MS = 1500;
 const AVATAR_MAX_DIMENSION = 1024;
 const AVATAR_OUTPUT_TYPE = "image/jpeg";
 const AVATAR_OUTPUT_QUALITY = 0.82;
 const QR_PRIMARY = "#55d6be";
 const QR_BG = "#0b0f14";
+
+// URL detection for auto-linkifying message text. Conservative pattern that
+// matches http(s) and bare www. links and stops at whitespace / common trailing punctuation.
+const URL_REGEX = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+const TRAILING_PUNCT_REGEX = /[.,!?:;)]+$/;
+
+function renderMessageText(text) {
+  if (!text) {
+    return null;
+  }
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+  URL_REGEX.lastIndex = 0;
+  while ((match = URL_REGEX.exec(text)) !== null) {
+    const start = match.index;
+    const raw = match[0];
+    // Trim trailing punctuation so it doesn't get pulled into the link.
+    let url = raw;
+    let trailing = "";
+    const trailMatch = url.match(TRAILING_PUNCT_REGEX);
+    if (trailMatch) {
+      trailing = trailMatch[0];
+      url = url.slice(0, url.length - trailing.length);
+    }
+    if (start > lastIndex) {
+      parts.push(text.slice(lastIndex, start));
+    }
+    const href = url.startsWith("http") ? url : `https://${url}`;
+    parts.push(
+      <a
+        key={`lnk-${key++}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        className="message-link"
+      >
+        {url}
+      </a>
+    );
+    if (trailing) {
+      parts.push(trailing);
+    }
+    lastIndex = start + raw.length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts;
+}
+
+function describeTyping(users, activeUser) {
+  const others = (users || []).filter((u) => u && u !== activeUser);
+  if (others.length === 0) {
+    return "";
+  }
+  if (others.length === 1) {
+    return `${others[0]} is typing…`;
+  }
+  if (others.length === 2) {
+    return `${others[0]} and ${others[1]} are typing…`;
+  }
+  const remaining = others.length - 2;
+  const noun = remaining === 1 ? "other is" : `others are`;
+  return `${others[0]}, ${others[1]} and ${remaining} ${noun} typing…`;
+}
 
 function buildNotificationBody(message) {
   if (!message) {
@@ -107,8 +178,14 @@ function TitleBar({
   inviteLoading,
   onOpenProfile,
   onGenerateInvite,
-  onLogout
+  onLogout,
+  connected,
+  onlineCount,
+  onlineUsers
 }) {
+  const presenceTitle = onlineUsers && onlineUsers.length
+    ? `Online: ${onlineUsers.join(", ")}`
+    : "No one else is online";
   return (
     <div className="title-bar">
       <div className="title-left">
@@ -128,7 +205,25 @@ function TitleBar({
           </button>
         )}
       </div>
-      <div className="title-center">{title}</div>
+      <div className="title-center">
+        <span>{title}</span>
+        {typeof connected === "boolean" && (
+          <span
+            className={`connection-status ${connected ? "online" : "offline"}`}
+            role="status"
+            aria-live="polite"
+            title={connected ? "Connected" : "Reconnecting…"}
+          >
+            <span className="connection-dot" aria-hidden="true" />
+            <span className="connection-label">{connected ? "Live" : "Offline"}</span>
+            {connected && typeof onlineCount === "number" && onlineCount > 0 && (
+              <span className="presence-count" title={presenceTitle} aria-label={presenceTitle}>
+                · {onlineCount} online
+              </span>
+            )}
+          </span>
+        )}
+      </div>
       <div className="title-right">
         <button
           type="button"
@@ -272,6 +367,8 @@ export default function App() {
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [oldestLoadedTs, setOldestLoadedTs] = useState(null);
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [typingUserList, setTypingUserList] = useState([]);
   const socketRef = useRef(null);
   const avatarUploadRef = useRef(null);
   const avatarCameraRef = useRef(null);
@@ -283,6 +380,8 @@ export default function App() {
   const lastNotifiedMessageIdRef = useRef(null);
   const activeUserRef = useRef("");
   const initialLoadDoneRef = useRef(false);
+  const lastTypingEmitRef = useRef(0);
+  const typingStopTimerRef = useRef(null);
 
   useEffect(() => {
     activeUserRef.current = activeUser || "";
@@ -416,7 +515,22 @@ export default function App() {
     socket.on("connect", () => {
       setConnected(true);
     });
-    socket.on("disconnect", () => setConnected(false));
+    socket.on("disconnect", () => {
+      setConnected(false);
+      setTypingUserList([]);
+    });
+    socket.on("presence", (payload) => {
+      if (!payload || !Array.isArray(payload.users)) {
+        return;
+      }
+      setOnlineUsers(payload.users);
+    });
+    socket.on("typing", (payload) => {
+      if (!payload || !Array.isArray(payload.users)) {
+        return;
+      }
+      setTypingUserList(payload.users);
+    });
     socket.on("history", (payload) => {
       if (!payload || !Array.isArray(payload.messages)) {
         return;
@@ -473,8 +587,17 @@ export default function App() {
       socket.off("history");
       socket.off("history:older");
       socket.off("message");
+      socket.off("presence");
+      socket.off("typing");
       socket.disconnect();
       socketRef.current = null;
+      if (typingStopTimerRef.current) {
+        clearTimeout(typingStopTimerRef.current);
+        typingStopTimerRef.current = null;
+      }
+      lastTypingEmitRef.current = 0;
+      setOnlineUsers([]);
+      setTypingUserList([]);
     };
   }, [status]);
 
@@ -805,6 +928,46 @@ export default function App() {
     }
   };
 
+  const emitTypingStop = () => {
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+    }
+    lastTypingEmitRef.current = 0;
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("typing", { isTyping: false });
+    }
+  };
+
+  const handleComposerTextChange = (event) => {
+    const value = event.target.value;
+    // Soft client-side cap matching the server limit so users get instant feedback.
+    const next = value.length > MAX_MESSAGE_LENGTH ? value.slice(0, MAX_MESSAGE_LENGTH) : value;
+    setText(next);
+
+    if (!socketRef.current || !socketRef.current.connected) {
+      return;
+    }
+
+    if (next.trim().length === 0) {
+      emitTypingStop();
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastTypingEmitRef.current >= TYPING_EMIT_INTERVAL_MS) {
+      lastTypingEmitRef.current = now;
+      socketRef.current.emit("typing", { isTyping: true });
+    }
+
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+    }
+    typingStopTimerRef.current = setTimeout(() => {
+      emitTypingStop();
+    }, TYPING_STOP_DEBOUNCE_MS);
+  };
+
   const handleSend = (event) => {
     event.preventDefault();
     if (!socketRef.current || uploading) {
@@ -824,6 +987,7 @@ export default function App() {
       });
       setText("");
       clearImage();
+      emitTypingStop();
     };
 
     if (imageFile) {
@@ -991,6 +1155,9 @@ export default function App() {
               onOpenProfile={() => { setProfileModalOpen(true); setMenuOpen(false); }}
               onGenerateInvite={() => { handleGenerateInvite(); setMenuOpen(false); }}
               onLogout={async () => { await handleLogout(); setMenuOpen(false); }}
+              connected={connected}
+              onlineCount={onlineUsers.length}
+              onlineUsers={onlineUsers}
             />
             {inviteToken && (
               <div className="invite-display">
@@ -1051,7 +1218,7 @@ export default function App() {
                       )}
                       <div className={isOwn ? "message-row own" : "message-row"}>
                         <div className={msg._live ? "message animate-in" : "message"}>
-                          {msg.text && <p>{msg.text}</p>}
+                          {msg.text && <p>{renderMessageText(msg.text)}</p>}
                           {msg.imageUrl && (
                             <img
                               className="message-image"
@@ -1088,6 +1255,30 @@ export default function App() {
                 <div ref={messagesEndRef} />
               </div>
 
+              <div className="composer-meta" aria-live="polite">
+                <span className="typing-indicator">
+                  {(() => {
+                    const label = describeTyping(typingUserList, activeUser);
+                    return label ? (
+                      <>
+                        <span className="typing-dots" aria-hidden="true">
+                          <span /><span /><span />
+                        </span>
+                        {label}
+                      </>
+                    ) : null;
+                  })()}
+                </span>
+                {text.length >= MESSAGE_LENGTH_WARNING && (
+                  <span
+                    className={`char-counter ${text.length >= MAX_MESSAGE_LENGTH ? "at-limit" : ""}`}
+                    aria-label={`${text.length} of ${MAX_MESSAGE_LENGTH} characters used`}
+                  >
+                    {text.length}/{MAX_MESSAGE_LENGTH}
+                  </span>
+                )}
+              </div>
+
               <form className="composer" onSubmit={handleSend}>
                 <button
                   type="button"
@@ -1109,7 +1300,8 @@ export default function App() {
                 </button>
                 <input
                   value={text}
-                  onChange={(event) => setText(event.target.value)}
+                  onChange={handleComposerTextChange}
+                  maxLength={MAX_MESSAGE_LENGTH}
                     placeholder="Drop a signal"
                   className="composer-input"
                 />

@@ -16,6 +16,9 @@ const AVATAR_OUTPUT_TYPE = "image/jpeg";
 const AVATAR_OUTPUT_QUALITY = 0.82;
 const QR_PRIMARY = "#55d6be";
 const QR_BG = "#0b0f14";
+const SCROLL_AT_BOTTOM_THRESHOLD = 80;
+const NOTIF_ICON = "/icon-192.svg";
+const NOTIF_BADGE = "/icon-monochrome.svg";
 
 // URL detection for auto-linkifying message text. Conservative pattern that
 // matches http(s) and bare www. links and stops at whitespace / common trailing punctuation.
@@ -165,6 +168,24 @@ const resizeAvatarForUpload = async (file) => {
   });
 };
 
+function Toasts({ toasts }) {
+  if (!toasts.length) {
+    return null;
+  }
+  return (
+    <div className="toast-container" role="status" aria-live="polite" aria-atomic="false">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast toast-${toast.type}`}>
+          {toast.type === "join" && "👋 "}
+          {toast.type === "leave" && "🚪 "}
+          {toast.type === "success" && "✓ "}
+          {toast.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TitleBar({
   title,
   onBack,
@@ -183,7 +204,8 @@ function TitleBar({
   onlineCount,
   onlineUsers,
   notifPermission,
-  onEnableNotifications
+  onEnableNotifications,
+  unreadCount
 }) {
   const presenceTitle = onlineUsers && onlineUsers.length
     ? `Online: ${onlineUsers.join(", ")}`
@@ -237,6 +259,11 @@ function TitleBar({
             <img src={avatarUrl} alt="Avatar" />
           ) : (
             <span>{activeUser ? activeUser[0]?.toUpperCase() : "?"}</span>
+          )}
+          {unreadCount > 0 && (
+            <span className="avatar-badge" aria-label={`${unreadCount} unread`}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
           )}
         </button>
         {showMenu && (
@@ -411,6 +438,13 @@ export default function App() {
   const initialLoadDoneRef = useRef(false);
   const lastTypingEmitRef = useRef(0);
   const typingStopTimerRef = useRef(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [toasts, setToasts] = useState([]);
+  const isAtBottomRef = useRef(true);
+  const toastIdRef = useRef(0);
+  const prevOnlineUsersRef = useRef(null);
+  const wasDisconnectedRef = useRef(false);
 
   useEffect(() => {
     activeUserRef.current = activeUser || "";
@@ -433,8 +467,8 @@ export default function App() {
     const body = buildNotificationBody(message);
     const options = {
       body,
-      icon: "/icon-192.svg",
-      badge: "/icon-monochrome.svg",
+      icon: NOTIF_ICON,
+      badge: NOTIF_BADGE,
       tag: "nexgrex-chat",
       renotify: true,
       data: { url: "/" }
@@ -535,6 +569,20 @@ export default function App() {
   }, [status]);
 
   useEffect(() => {
+    document.title = unreadCount > 0 ? `(${unreadCount}) NEXGREX` : "NEXGREX";
+  }, [unreadCount]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && isAtBottomRef.current) {
+        setUnreadCount(0);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  useEffect(() => {
     if (status !== "logged-in") {
       return;
     }
@@ -544,15 +592,67 @@ export default function App() {
 
     socket.on("connect", () => {
       setConnected(true);
+      if (wasDisconnectedRef.current) {
+        wasDisconnectedRef.current = false;
+        const id = ++toastIdRef.current;
+        setToasts((prev) => [...prev, { id, message: "Connection restored", type: "success" }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+      }
     });
     socket.on("disconnect", () => {
       setConnected(false);
       setTypingUserList([]);
+      wasDisconnectedRef.current = true;
     });
     socket.on("presence", (payload) => {
       if (!payload || !Array.isArray(payload.users)) {
         return;
       }
+
+      const prev = prevOnlineUsersRef.current;
+      if (prev !== null) {
+        const prevSet = new Set(prev);
+        const newSet = new Set(payload.users);
+        for (const user of payload.users) {
+          if (!prevSet.has(user) && user !== activeUserRef.current) {
+            const id = ++toastIdRef.current;
+            setToasts((p) => [...p, { id, message: `${user} joined`, type: "join" }]);
+            setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
+            // Push notification for join when page is in background
+            if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState !== "visible") {
+              const title = `${user} is now online`;
+              const opts = {
+                body: "Drop in and say hi in NEXGREX",
+                icon: NOTIF_ICON,
+                badge: NOTIF_BADGE,
+                tag: "nexgrex-presence",
+                silent: true,
+                data: { url: "/" }
+              };
+              (async () => {
+                try {
+                  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.showNotification(title, opts);
+                  } else {
+                    new Notification(title, opts);
+                  }
+                } catch {
+                  // Ignore notification errors to avoid disrupting the presence update.
+                }
+              })();
+            }
+          }
+        }
+        for (const user of prev) {
+          if (!newSet.has(user)) {
+            const id = ++toastIdRef.current;
+            setToasts((p) => [...p, { id, message: `${user} left`, type: "leave" }]);
+            setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
+          }
+        }
+      }
+      prevOnlineUsersRef.current = payload.users;
       setOnlineUsers(payload.users);
     });
     socket.on("typing", (payload) => {
@@ -606,6 +706,9 @@ export default function App() {
       if (!isOwn) {
         lastNotifiedMessageIdRef.current = message.id || null;
         notifyIncomingMessage(message);
+        if (!isAtBottomRef.current || document.visibilityState !== "visible") {
+          setUnreadCount((prev) => prev + 1);
+        }
       }
 
       setMessages((prev) => [...prev, { ...message, _live: true }]);
@@ -626,6 +729,8 @@ export default function App() {
         typingStopTimerRef.current = null;
       }
       lastTypingEmitRef.current = 0;
+      prevOnlineUsersRef.current = null;
+      wasDisconnectedRef.current = false;
       setOnlineUsers([]);
       setTypingUserList([]);
     };
@@ -642,6 +747,15 @@ export default function App() {
     }
 
     const handleScroll = () => {
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= SCROLL_AT_BOTTOM_THRESHOLD;
+      if (atBottom !== isAtBottomRef.current) {
+        isAtBottomRef.current = atBottom;
+        setIsAtBottom(atBottom);
+        if (atBottom) {
+          setUnreadCount(0);
+        }
+      }
+
       if (!socketRef.current || loadingOlderMessages || !hasMoreHistory || !oldestLoadedTs) {
         return;
       }
@@ -713,6 +827,17 @@ export default function App() {
 
     if (skipAutoScrollRef.current) {
       skipAutoScrollRef.current = false;
+      return;
+    }
+
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    if (
+      initialLoadDoneRef.current &&
+      !isAtBottomRef.current &&
+      lastMsg?._live &&
+      lastMsg?.user &&
+      lastMsg.user !== activeUserRef.current
+    ) {
       return;
     }
 
@@ -818,6 +943,8 @@ export default function App() {
     setMenuOpen(false);
     setStatus("logged-out");
     setConnected(false);
+    setUnreadCount(0);
+    prevOnlineUsersRef.current = null;
   };
 
   const uploadAvatarFile = async (file) => {
@@ -1199,7 +1326,9 @@ export default function App() {
               onlineUsers={onlineUsers}
               notifPermission={notifPermission}
               onEnableNotifications={handleEnableNotifications}
+              unreadCount={unreadCount}
             />
+            <Toasts toasts={toasts} />
             {inviteToken && (
               <div className="invite-display">
                 <p className="invite-label">Share this invite link:</p>
@@ -1229,6 +1358,7 @@ export default function App() {
             )}
             {error && <p className="error" style={{ margin: "12px 0" }}>{error}</p>}
             <div className="chat">
+              <div className="messages-wrapper">
               <div className="messages" ref={messagesContainerRef}>
                 {loadingOlderMessages && <div className="history-status">Loading older messages...</div>}
                 {messages.length === 0 && (
@@ -1258,7 +1388,7 @@ export default function App() {
                         </div>
                       )}
                       <div className={isOwn ? "message-row own" : "message-row"}>
-                        <div className={msg._live ? "message animate-in" : "message"}>
+                        <div className={msg._live ? (isOwn ? "message animate-in" : "message incoming-glow") : "message"}>
                           {msg.text && <p>{renderMessageText(msg.text)}</p>}
                           {msg.imageUrl && (
                             <img
@@ -1294,6 +1424,22 @@ export default function App() {
                   );
                 })}
                 <div ref={messagesEndRef} />
+              </div>
+              {!isAtBottom && unreadCount > 0 && (
+                <button
+                  type="button"
+                  className="new-msg-btn"
+                  onClick={() => {
+                    setUnreadCount(0);
+                    isAtBottomRef.current = true;
+                    setIsAtBottom(true);
+                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  <span className="new-msg-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                  <span>↓ new</span>
+                </button>
+              )}
               </div>
 
               <div className="composer-meta" aria-live="polite">

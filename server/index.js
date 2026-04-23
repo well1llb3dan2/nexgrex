@@ -88,6 +88,60 @@ let messagesCollection;
 let invitesCollection;
 
 const GLOBAL_ROOM_ID = "global";
+const MESSAGE_MAX_LENGTH = 500;
+const TYPING_TTL_MS = 6000;
+
+// Presence: socketId -> username (multiple sockets per user are tolerated)
+const onlineSockets = new Map();
+// Typing: username -> { expiresAt, timeout }
+const typingUsers = new Map();
+
+function getOnlineUsernames() {
+  return [...new Set(onlineSockets.values())].sort((a, b) => a.localeCompare(b));
+}
+
+function broadcastPresence() {
+  if (!io) {
+    return;
+  }
+  const users = getOnlineUsernames();
+  io.to(GLOBAL_ROOM_ID).emit("presence", { users, count: users.length });
+}
+
+function broadcastTyping() {
+  if (!io) {
+    return;
+  }
+  const users = [...typingUsers.keys()].sort((a, b) => a.localeCompare(b));
+  io.to(GLOBAL_ROOM_ID).emit("typing", { users });
+}
+
+function clearTypingFor(username) {
+  const entry = typingUsers.get(username);
+  if (entry) {
+    clearTimeout(entry.timeout);
+    typingUsers.delete(username);
+    broadcastTyping();
+  }
+}
+
+function setTypingFor(username) {
+  if (!username) {
+    return;
+  }
+  const existing = typingUsers.get(username);
+  if (existing) {
+    clearTimeout(existing.timeout);
+  }
+  const timeout = setTimeout(() => {
+    typingUsers.delete(username);
+    broadcastTyping();
+  }, TYPING_TTL_MS);
+  typingUsers.set(username, { expiresAt: Date.now() + TYPING_TTL_MS, timeout });
+  if (!existing) {
+    broadcastTyping();
+  }
+}
 
 async function hydrateMessagesWithAvatars(docs) {
   if (!docs.length) {
@@ -619,6 +673,12 @@ io.on("connection", (socket) => {
   socket.data.activeRoom = GLOBAL_ROOM_ID;
   socket.join(GLOBAL_ROOM_ID);
 
+  // Track presence
+  if (socket.data.username) {
+    onlineSockets.set(socket.id, socket.data.username);
+    broadcastPresence();
+  }
+
   loadMessageHistoryPage()
     .then((page) => {
       socket.emit("history", page);
@@ -626,6 +686,11 @@ io.on("connection", (socket) => {
     .catch(() => {
       socket.emit("history", { messages: [], hasMore: false, nextBeforeTs: null });
     });
+
+  // Send current presence + typing snapshot to the new socket
+  const initialUsers = getOnlineUsernames();
+  socket.emit("presence", { users: initialUsers, count: initialUsers.length });
+  socket.emit("typing", { users: [...typingUsers.keys()].sort((a, b) => a.localeCompare(b)) });
 
   socket.on("loadOlderMessages", async (payload) => {
     try {
@@ -647,7 +712,7 @@ io.on("connection", (socket) => {
     }
 
     const text = typeof payload.text === "string" ? payload.text : "";
-    const trimmed = text.trim().slice(0, 500);
+    const trimmed = text.trim().slice(0, MESSAGE_MAX_LENGTH);
     const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : null;
     const imageType = typeof payload.imageType === "string" ? payload.imageType : null;
 
@@ -673,10 +738,35 @@ io.on("connection", (socket) => {
 
     try {
       await messagesCollection.insertOne(msg);
+      // Sender is no longer typing once a message is sent.
+      clearTypingFor(socket.data.username);
       io.to(GLOBAL_ROOM_ID).emit("message", msg);
     } catch (error) {
       socket.emit("error", "Message failed to save.");
     }
+  });
+
+  socket.on("typing", (payload) => {
+    const username = socket.data.username;
+    if (!username) {
+      return;
+    }
+    const isTyping = !!(payload && payload.isTyping);
+    if (isTyping) {
+      setTypingFor(username);
+    } else {
+      clearTypingFor(username);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    const wasUser = onlineSockets.get(socket.id);
+    onlineSockets.delete(socket.id);
+    // If this user no longer has any sockets connected, drop typing too.
+    if (wasUser && ![...onlineSockets.values()].includes(wasUser)) {
+      clearTypingFor(wasUser);
+    }
+    broadcastPresence();
   });
 });
 

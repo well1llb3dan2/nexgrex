@@ -19,7 +19,7 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB || "nexgrex";
-const SESSION_HOURS = 12;
+const SESSION_HOURS = 720; // 30 days
 const INVITE_HOURS = 24;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
@@ -431,7 +431,7 @@ app.post("/api/signup", signupLimiter, async (req, res) => {
     httpOnly: true,
     sameSite: "lax",
     secure: NODE_ENV === "production",
-    maxAge: 1000 * 60 * 60 * 12
+    maxAge: 1000 * 60 * 60 * 24 * 30 // 30 days
   });
 
   return res.json({ username, avatarUrl: null, theme: DEFAULT_THEME });
@@ -468,7 +468,7 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     httpOnly: true,
     sameSite: "lax",
     secure: NODE_ENV === "production",
-    maxAge: 1000 * 60 * 60 * 12
+    maxAge: 1000 * 60 * 60 * 24 * 30 // 30 days
   });
 
   return res.json({

@@ -205,7 +205,10 @@ function TitleBar({
   onlineUsers,
   notifPermission,
   onEnableNotifications,
-  unreadCount
+  unreadCount,
+  showInstallOption,
+  onInstallPWA,
+  isIOSDevice
 }) {
   const presenceTitle = onlineUsers && onlineUsers.length
     ? `Online: ${onlineUsers.join(", ")}`
@@ -347,6 +350,32 @@ function TitleBar({
                 </>
               )}
             </button>
+            {showInstallOption && onInstallPWA && (
+              <>
+                <div className="menu-divider" />
+                <button type="button" onClick={onInstallPWA} className="menu-action menu-item">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M12 3v12M8 11l4 4 4-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M4 17v1.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V17"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span>{isIOSDevice ? "Install on iOS" : "Install App"}</span>
+                </button>
+              </>
+            )}
+            <div className="menu-divider" />
             <button type="button" onClick={onLogout} className="menu-action menu-item">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -380,6 +409,62 @@ function TitleBar({
     </div>
   );
 }
+
+// Detect iOS Safari (no beforeinstallprompt support).
+// Also covers iPads on iOS 13+ which report navigator.platform as "MacIntel".
+const isIOS =
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) &&
+  !("MSStream" in window);
+
+function IOSInstallModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>📲 Install on iOS</h3>
+          <button type="button" className="modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          <p className="ios-install-intro">
+            Safari doesn't support automatic installs, but you can add NEXGREX to your Home Screen in a few taps:
+          </p>
+          <ol className="ios-install-steps">
+            <li>
+              <span className="ios-install-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path d="M12 3v12M8 11l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M4 17v1.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </span>
+              Tap the <strong>Share</strong> button (the square with an arrow) in Safari's toolbar
+            </li>
+            <li>
+              <span className="ios-install-icon" aria-hidden="true">➕</span>
+              Scroll down and tap <strong>"Add to Home Screen"</strong>
+            </li>
+            <li>
+              <span className="ios-install-icon" aria-hidden="true">✅</span>
+              Tap <strong>"Add"</strong> in the top-right corner
+            </li>
+          </ol>
+          <p className="ios-install-note">
+            NEXGREX will then open like a native app — no browser bar, full screen.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Detect standalone / already-installed
+const isStandalone =
+  typeof window !== "undefined" &&
+  (window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true);
 
 export default function App() {
   const [status, setStatus] = useState("checking");
@@ -445,10 +530,22 @@ export default function App() {
   const toastIdRef = useRef(0);
   const prevOnlineUsersRef = useRef(null);
   const wasDisconnectedRef = useRef(false);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [iosInstallModalOpen, setIosInstallModalOpen] = useState(false);
+  const showInstallOption = !isStandalone && (deferredInstallPrompt !== null || isIOS);
 
   useEffect(() => {
     activeUserRef.current = activeUser || "";
   }, [activeUser]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   const notifyIncomingMessage = async (message) => {
     if (typeof window === "undefined" || typeof Notification === "undefined") {
@@ -1181,6 +1278,25 @@ export default function App() {
     setTheme((prev) => (prev === "light" ? "midnight" : "light"));
   };
 
+  const handleInstallPWA = async () => {
+    if (isIOS) {
+      setIosInstallModalOpen(true);
+      return;
+    }
+    if (!deferredInstallPrompt) {
+      return;
+    }
+    deferredInstallPrompt.prompt();
+    try {
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === "accepted") {
+        setDeferredInstallPrompt(null);
+      }
+    } catch {
+      // Ignore errors from the install prompt.
+    }
+  };
+
   const handleEnableNotifications = () => {
     if (typeof Notification === "undefined") {
       return;
@@ -1206,6 +1322,25 @@ export default function App() {
           <h1>Signal the room</h1>
           <p>Private invites, a single shared feed, and a sharper way to keep the thread alive.</p>
         </header>
+      )}
+
+      {status === "logged-out" && showInstallOption && (
+        <div className="install-banner">
+          <div className="install-banner-text">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" className="install-banner-icon">
+              <path d="M12 3v12M8 11l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 17v1.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            {isIOS ? "Add NEXGREX to your Home Screen for the best experience" : "Install NEXGREX as an app for quick access"}
+          </div>
+          <button
+            type="button"
+            className="install-banner-btn"
+            onClick={handleInstallPWA}
+          >
+            {isIOS ? "How?" : "Install"}
+          </button>
+        </div>
       )}
 
       {status === "logged-out" && (
@@ -1327,6 +1462,9 @@ export default function App() {
               notifPermission={notifPermission}
               onEnableNotifications={handleEnableNotifications}
               unreadCount={unreadCount}
+              showInstallOption={showInstallOption}
+              onInstallPWA={() => { handleInstallPWA(); setMenuOpen(false); }}
+              isIOSDevice={isIOS}
             />
             <Toasts toasts={toasts} />
             {inviteToken && (
@@ -1721,7 +1859,17 @@ export default function App() {
             </div>
           )}
 
+          {/* iOS Install Instructions Modal */}
+          {iosInstallModalOpen && (
+            <IOSInstallModal onClose={() => setIosInstallModalOpen(false)} />
+          )}
+
         </section>
+      )}
+
+      {/* iOS install modal accessible from the login-page install banner */}
+      {status !== "logged-in" && iosInstallModalOpen && (
+        <IOSInstallModal onClose={() => setIosInstallModalOpen(false)} />
       )}
     </div>
   );

@@ -1439,6 +1439,101 @@
     background: rgba(106, 227, 193, 0.08);
     color: var(--primary);
   }
+
+  /* PWA Install Banner */
+  .install-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--surface-muted);
+    border: 1px solid rgba(106, 227, 193, 0.25);
+    border-radius: var(--radius-soft);
+    font-size: 0.85rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .install-banner-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .install-banner-icon {
+    flex-shrink: 0;
+    color: var(--primary);
+    opacity: 0.8;
+  }
+
+  .install-banner-btn {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(106, 227, 193, 0.45);
+    background: rgba(106, 227, 193, 0.1);
+    color: var(--primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.18s;
+
+    &:hover {
+      background: rgba(106, 227, 193, 0.18);
+    }
+  }
+
+  /* iOS Install Instructions */
+  .ios-install-intro {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .ios-install-steps {
+    margin: 0 0 14px;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+
+    strong {
+      color: var(--primary);
+    }
+  }
+
+  .ios-install-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-soft);
+    background: var(--surface-muted);
+    font-size: 1rem;
+    color: var(--primary);
+  }
+
+  .ios-install-note {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-style: italic;
+  }
 }
 
 @layer utils {
